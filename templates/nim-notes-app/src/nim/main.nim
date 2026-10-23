@@ -77,9 +77,10 @@ proc handleRpcRequest(webviewId: uint32; requestId: uint64; rpcMethod: string; p
   let state = appState()
   case rpcMethod
   of "getNotes":
-    acquire(state.mutex)
-    let notes = loadAllNotes(state.store)
-    release(state.mutex)
+    let notes = block:
+      acquire(state.mutex)
+      defer: release(state.mutex)
+      loadAllNotes(state.store)
     sendRpcResponse(webviewId, requestId, notesToJson(notes))
   of "getNote":
     if params.kind != JObject:
@@ -89,9 +90,10 @@ proc handleRpcRequest(webviewId: uint32; requestId: uint64; rpcMethod: string; p
     if id.isNone or id.get.len == 0:
       sendRpcError(webviewId, requestId, "Missing note id")
       return
-    acquire(state.mutex)
-    let note = loadNote(state.store, id.get)
-    release(state.mutex)
+    let note = block:
+      acquire(state.mutex)
+      defer: release(state.mutex)
+      loadNote(state.store, id.get)
     if note.isNone:
       sendRpcResponse(webviewId, requestId, newJNull())
     else:
@@ -113,15 +115,10 @@ proc handleRpcRequest(webviewId: uint32; requestId: uint64; rpcMethod: string; p
         params["content"].getStr()
       else:
         ""
-    acquire(state.mutex)
-    let saved = saveNote(
-      state.store,
-      state.rng,
-      noteId,
-      title,
-      content,
-    )
-    release(state.mutex)
+    let saved = block:
+      acquire(state.mutex)
+      defer: release(state.mutex)
+      saveNote(state.store, state.rng, noteId, title, content)
     sendRpcResponse(
       webviewId,
       requestId,
@@ -135,9 +132,10 @@ proc handleRpcRequest(webviewId: uint32; requestId: uint64; rpcMethod: string; p
     if id.isNone or id.get.len == 0:
       sendRpcError(webviewId, requestId, "Missing note id")
       return
-    acquire(state.mutex)
-    let ok = deleteNote(state.store, id.get)
-    release(state.mutex)
+    let ok = block:
+      acquire(state.mutex)
+      defer: release(state.mutex)
+      deleteNote(state.store, id.get)
     sendRpcResponse(webviewId, requestId, %*{"success": ok})
   of "exportNote":
     if params.kind != JObject:
@@ -147,9 +145,10 @@ proc handleRpcRequest(webviewId: uint32; requestId: uint64; rpcMethod: string; p
     if id.isNone or id.get.len == 0:
       sendRpcError(webviewId, requestId, "Missing note id")
       return
-    acquire(state.mutex)
-    let note = loadNote(state.store, id.get)
-    release(state.mutex)
+    let note = block:
+      acquire(state.mutex)
+      defer: release(state.mutex)
+      loadNote(state.store, id.get)
     if note.isNone:
       sendRpcResponse(webviewId, requestId, %*{"success": false})
       return
@@ -207,13 +206,24 @@ proc handleHostMessage(webviewId: uint32; message: string) =
         parsed["params"]
       else:
         newJNull()
-    handleRpcRequest(webviewId, requestId, rpcMethod.get, params)
+    try:
+      handleRpcRequest(webviewId, requestId, rpcMethod.get, params)
+    except CatchableError:
+      sendRpcError(webviewId, requestId, "Could not complete notes request")
 
 proc hostBridge(webviewId: uint32; message: cstring) {.cdecl, raises: [].} =
   try:
     handleHostMessage(webviewId, $message)
   except CatchableError:
     discard
+
+proc processQueuedHostMessage(webviewId: uint32; message: cstring) =
+  try:
+    handleHostMessage(webviewId, $message)
+  except CatchableError:
+    stderr.writeLine("[nim-notes] failed to process queued RPC packet")
+  finally:
+    gState.core.freeCoreString(message)
 
 proc drainHostMessageQueueImpl() =
   while gQueueRunning.load():
@@ -226,8 +236,7 @@ proc drainHostMessageQueueImpl() =
       let message = gState.core.popNextQueuedHostMessage(webviewId)
       if message.isNil:
         break
-      handleHostMessage(webviewId, $message)
-      gState.core.freeCoreString(message)
+      processQueuedHostMessage(webviewId, message)
       drainedAny = true
     if not drainedAny:
       sleep(10)
@@ -339,5 +348,5 @@ proc runMainProcess() =
   if runErr != ebNone:
     stderr.writeLine("[nim-notes] main thread exited with error: ", runErr)
 
-when isMainModule:
+when isMainModule and not defined(nimNotesRpcTest):
   runMainProcess()
