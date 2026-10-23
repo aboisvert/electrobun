@@ -27,7 +27,7 @@ type
   WindowResizeHandler* = proc (windowId: uint32; x, y, width, height: float64) {.cdecl, raises: [].}
   WindowFocusHandler* = proc (windowId: uint32) {.cdecl, raises: [].}
   WindowBlurHandler* = proc (windowId: uint32) {.cdecl, raises: [].}
-  WindowKeyHandler* = proc (windowId: uint32; a, b, c, d, e: uint32) {.cdecl, raises: [].}
+  WindowKeyHandler* = proc (windowId, keyCode, modifiers, isDown, isRepeat: uint32) {.cdecl, raises: [].}
   DecideNavigationHandler* = proc (webviewId: uint32; url: cstring): uint32 {.cdecl, raises: [].}
   WebviewEventHandler* = proc (webviewId: uint32; event, payload: cstring) {.cdecl, raises: [].}
   WebviewPostMessageHandler* = proc (webviewId: uint32; message: cstring) {.cdecl, raises: [].}
