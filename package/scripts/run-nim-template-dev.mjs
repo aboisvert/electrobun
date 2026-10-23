@@ -15,7 +15,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { selectHutchBinary } from "./hutch-launcher.mjs";
 import { readElectrobunConfig } from "./template-config.mjs";
-import { resolveNimBinary } from "./nim-toolchain.mjs";
+import { nimCompilerOptions, resolveNimBinary } from "./nim-toolchain.mjs";
 import { nimRuntimeLibraryPaths } from "./nim-runtime-libraries.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -308,12 +308,14 @@ function stageLocalBundle(logPrefix, templateRoot, app) {
 function compileNimMain(logPrefix, templateRoot, executable, nimEntry) {
 	const nim = resolveNimBinary().binary;
 	const sdkPath = resolveSdkPath();
+	const compiler = nimCompilerOptions();
 	run(
 		logPrefix,
 		"Compiling Nim main process",
 		nim,
 		[
 			"c",
+			...compiler.args,
 			"--threads:on",
 			"--mm:orc",
 			"--verbosity:0",
@@ -322,6 +324,7 @@ function compileNimMain(logPrefix, templateRoot, executable, nimEntry) {
 			nimEntry,
 		],
 		templateRoot,
+		compiler.env,
 	);
 	if (process.platform !== "win32") {
 		chmodSync(executable, 0o755);

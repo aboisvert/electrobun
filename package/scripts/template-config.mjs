@@ -143,9 +143,9 @@ export function templateNimEntrypoint(config) {
 	const entrypoint = config?.build?.nim?.entrypoint;
 	if (
 		typeof entrypoint === "string" &&
-		entrypoint.startsWith("src/nim/")
+		entrypoint.length > 0
 	) {
-		return entrypoint.slice("src/nim/".length);
+		return entrypoint;
 	}
 	return NIM_ENTRYPOINT_DEFAULT;
 }

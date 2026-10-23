@@ -75,7 +75,7 @@ export default {
 		"test:macos-inspector-layout": "scripts/test-macos-inspector-layout.sh",
 		"test:templates": ["hutch", "scripts/check-release.ts", "templates"],
 		"test:odin-templates": "node scripts/test-odin-templates.mjs",
-		"test:nim-templates": "node --test scripts/nim-runtime-libraries.test.mjs && node scripts/test-nim-templates.mjs",
+		"test:nim-templates": "node --test scripts/nim-runtime-libraries.test.mjs scripts/template-config.test.mjs && node scripts/test-nim-templates.mjs",
 		"run:nim-hello-world": "node scripts/run-nim-template-dev.mjs nim-hello-world",
 		"run:nim-notes-app": "node scripts/run-nim-template-dev.mjs nim-notes-app",
 		"test:template-publisher": "node --test ../scripts/publish-templates.test.mjs",

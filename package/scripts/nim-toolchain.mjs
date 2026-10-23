@@ -16,6 +16,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NIM_VERSION } from "../src/shared/nim-version.ts";
+import { msvcEnvironment } from "./windows-msvc-environment.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -33,6 +34,12 @@ export function vendoredNimBinary() {
 }
 
 const INSTRUCTIONS = `Run the package build to vendor the pinned Nim ${NIM_VERSION} toolchain: cd package && hutch build.ts (or: bun build.ts).`;
+
+export function nimCompilerOptions() {
+	return process.platform === "win32"
+		? { args: ["--cc:vcc"], env: msvcEnvironment() }
+		: { args: [], env: process.env };
+}
 
 export function resolveNimBinary() {
 	const vendored = vendoredNimBinary();

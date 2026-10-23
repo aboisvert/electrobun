@@ -3,9 +3,10 @@ import { existsSync, mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveNimBinary } from "../../package/scripts/nim-toolchain.mjs";
+import { nimCompilerOptions, resolveNimBinary } from "../../package/scripts/nim-toolchain.mjs";
 
 const kitchen = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const compiler = nimCompilerOptions();
 // Explicitly provided paths are trusted as-is (no version check); the shared
 // helper otherwise prefers the vendored toolchain and only falls back to a
 // system nim matching the pinned version (see package/scripts/nim-toolchain.mjs).
@@ -29,7 +30,7 @@ function run(command, args) {
 		cwd: scratch,
 		stdio: "inherit",
 		windowsHide: true,
-		env: process.env,
+		env: compiler.env,
 	});
 	if (result.error || result.status !== 0) {
 		throw new Error(`Nim callback isolation tests failed (${result.error?.message || result.status})`);
@@ -43,6 +44,7 @@ try {
 		console.log(`[nim-observations] Test executable: ${executable}`);
 		run(nim, [
 			"c",
+			...compiler.args,
 			"--threads:on",
 			"--mm:orc",
 			"-o:" + executable,

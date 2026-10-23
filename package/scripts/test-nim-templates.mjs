@@ -2,7 +2,6 @@
 
 import { spawnSync } from "node:child_process";
 import {
-	copyFileSync,
 	existsSync,
 	mkdtempSync,
 	mkdirSync,
@@ -16,7 +15,7 @@ import {
 	readElectrobunConfig,
 	templateNimEntrypoint,
 } from "./template-config.mjs";
-import { resolveNimBinary } from "./nim-toolchain.mjs";
+import { nimCompilerOptions, resolveNimBinary } from "./nim-toolchain.mjs";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repositoryRoot = resolve(packageRoot, "..");
@@ -28,6 +27,7 @@ if (process.platform === "win32" && process.arch === "arm64") {
 }
 
 const nimBinary = resolveNimBinary().binary;
+const compiler = nimCompilerOptions();
 
 function templateNimPackages() {
 	return readdirSync(templatesRoot, { withFileTypes: true })
@@ -46,19 +46,11 @@ async function readMainEntrypoint(templateName) {
 }
 
 function resolveSdkCollection() {
-	const builtCollection = join(packageRoot, "dist", "nim-sdk");
-	if (existsSync(join(builtCollection, "electrobun.nim"))) {
-		return { path: builtCollection, cleanup: null };
-	}
-
-	const sourceSdk = join(packageRoot, "src", "sdks", "nim", "electrobun.nim");
-	if (!existsSync(sourceSdk)) {
+	const sourceSdk = join(packageRoot, "src", "sdks", "nim");
+	if (!existsSync(join(sourceSdk, "electrobun.nim"))) {
 		throw new Error(`Electrobun Nim SDK source not found at ${sourceSdk}`);
 	}
-
-	const stagingRoot = mkdtempSync(join(tmpdir(), "electrobun-nim-tests-"));
-	copyFileSync(sourceSdk, join(stagingRoot, "electrobun.nim"));
-	return { path: stagingRoot, cleanup: stagingRoot };
+	return sourceSdk;
 }
 
 function removeTemporaryDirectory(path) {
@@ -77,6 +69,7 @@ function removeTemporaryDirectory(path) {
 
 function nimCommonArgs(sdkPath) {
 	return [
+		...compiler.args,
 		"--threads:on",
 		"--mm:orc",
 		"--verbosity:0",
@@ -86,7 +79,7 @@ function nimCommonArgs(sdkPath) {
 }
 
 function runNim(cwd, args) {
-	const result = spawnSync(nimBinary, args, { cwd, stdio: "inherit" });
+	const result = spawnSync(nimBinary, args, { cwd, env: compiler.env, stdio: "inherit" });
 	if (result.error) throw result.error;
 	if (result.status !== 0) {
 		throw new Error(
@@ -100,9 +93,19 @@ if (templates.length === 0) {
 	throw new Error("No Nim template packages were found");
 }
 
-const sdkCollection = resolveSdkCollection();
+const sdkPath = resolveSdkCollection();
 const executionRoot = mkdtempSync(join(tmpdir(), "electrobun-nim-run-"));
 try {
+	for (const testFile of readdirSync(sdkPath).filter((file) => file.endsWith("_test.nim")).sort()) {
+		runNim(sdkPath, [
+			...nimCommonArgs(sdkPath),
+			testFile === "callback_abi_test.nim" ? "cpp" : "c",
+			"-r",
+			`--nimcache:${join(executionRoot, testFile + "-cache")}`,
+			`-o:${join(executionRoot, testFile.slice(0, -4))}`,
+			testFile,
+		]);
+	}
 	for (const template of templates) {
 		console.log(`Testing ${template.name}...`);
 		const scratchDir = join(executionRoot, template.name);
@@ -112,29 +115,29 @@ try {
 			.sort();
 		for (const testFile of testFiles) {
 			runNim(template.nimDir, [
-				...nimCommonArgs(sdkCollection.path),
+				...nimCommonArgs(sdkPath),
 				"c",
 				"-r",
+				`--nimcache:${join(scratchDir, testFile + "-cache")}`,
 				`-o:${join(scratchDir, testFile.slice(0, -".nim".length))}`,
 				testFile,
 			]);
 		}
 
 		const mainEntry = await readMainEntrypoint(template.name);
-		const mainPath = join(template.nimDir, mainEntry);
+		const mainPath = resolve(templatesRoot, template.name, mainEntry);
 		if (!existsSync(mainPath)) {
 			throw new Error(`${template.name} missing main entrypoint at ${mainPath}`);
 		}
 		runNim(template.nimDir, [
-			...nimCommonArgs(sdkCollection.path),
-			"check",
-			mainEntry,
+			...nimCommonArgs(sdkPath),
+			"c",
+			`--nimcache:${join(scratchDir, "main-cache")}`,
+			`-o:${join(scratchDir, "main")}`,
+			mainPath,
 		]);
 	}
 } finally {
-	if (sdkCollection.cleanup) {
-		removeTemporaryDirectory(sdkCollection.cleanup);
-	}
 	removeTemporaryDirectory(executionRoot);
 }
 
