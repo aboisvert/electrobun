@@ -50,6 +50,9 @@ const odinWgpuTemplates = [
 const expectedPackageFreeTemplates = [
 	"all",
 	"go-maze-wgpu",
+	"nim-hello-world",
+	"nim-notes-app",
+	"nim-particles-wgpu",
 	...odinWgpuTemplates,
 	"rust-flock-wgpu",
 	"zig-wgpu",
@@ -611,7 +614,7 @@ describe("Electrobun template package boundaries", () => {
      const configPath = join(templatesRoot, entry.name, "electrobun.config.ts");
      if (!existsSync(configPath)) continue;
      const { default: config } = await import(configPath);
-     if (["zig", "rust", "go", "odin"].includes(config.build.mainProcess)) continue;
+      if (["zig", "rust", "go", "odin", "nim"].includes(config.build.mainProcess)) continue;
      const runtime = entry.name.startsWith("ui-") ? "cottontail" : "bun";
      expect(config.build.mainProcess).toBe(runtime);
      expect(config.build[runtime === "bun" ? "cottontail" : "bun"]).toBeUndefined();

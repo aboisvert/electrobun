@@ -90,10 +90,10 @@ describe("kitchen matrix", () => {
 		expect(rustSource).toStartWith("use electrobun::{");
 	});
 
-	it("uses the reduced seven-variant interactive matrix by default", () => {
+	it("uses the reduced eight-variant interactive matrix by default", () => {
 		const matrix = createKitchenMatrix(false, undefined, "win32", "x64");
-		expect(matrix).toHaveLength(7);
-		expect(new Set(matrix.map(kitchenVariantKey)).size).toBe(7);
+		expect(matrix).toHaveLength(8);
+		expect(new Set(matrix.map(kitchenVariantKey)).size).toBe(8);
 		for (const mainProcess of KITCHEN_MAIN_PROCESSES) {
 			expect(matrix).toContainEqual({ mainProcess, renderer: "native" });
 		}
@@ -102,10 +102,10 @@ describe("kitchen matrix", () => {
 		]);
 	});
 
-	it("can expand to the complete twelve-variant matrix", () => {
+	it("can expand to the complete fourteen-variant matrix", () => {
 		const matrix = createKitchenMatrix(true, undefined, "win32", "x64");
-		expect(matrix).toHaveLength(12);
-		expect(new Set(matrix.map(kitchenVariantKey)).size).toBe(12);
+		expect(matrix).toHaveLength(14);
+		expect(new Set(matrix.map(kitchenVariantKey)).size).toBe(14);
 		for (const mainProcess of KITCHEN_MAIN_PROCESSES) {
 			expect(matrix).toContainEqual({ mainProcess, renderer: "native" });
 			expect(matrix).toContainEqual({ mainProcess, renderer: "cef" });
@@ -128,12 +128,14 @@ describe("kitchen matrix", () => {
 		const matrix = createKitchenMatrix(true, undefined, "win32", "arm64");
 		expect(matrix).toHaveLength(10);
 		expect(matrix.some(({ mainProcess }) => mainProcess === "odin")).toBe(false);
+		expect(matrix.some(({ mainProcess }) => mainProcess === "nim")).toBe(false);
 		for (const mainProcess of ["cottontail", "bun", "zig", "rust", "go"]) {
 			for (const renderer of ["native", "cef"]) {
 				expect(matrix).toContainEqual({ mainProcess, renderer });
 			}
 		}
 		expect(() => createKitchenMatrix(false, [{ mainProcess: "odin", renderer: "native" }], "win32", "arm64")).toThrow("unsupported on win32-arm64");
+		expect(() => createKitchenMatrix(false, [{ mainProcess: "nim", renderer: "native" }], "win32", "arm64")).toThrow("unsupported on win32-arm64");
 	});
 
 	it("requires a complete and valid environment override", () => {

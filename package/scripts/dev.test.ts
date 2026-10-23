@@ -150,10 +150,11 @@ const armVmCommands = createVmTestCommands({ hutchBinary, packageDir, platform: 
 assert(armVmCommands.length === 15, "Windows ARM64 should test ten supported Kitchen variants and five common stages");
 assert(armVmCommands[0]!.args.includes("--jobs=1"), "Windows ARM64 builds run serially");
 assert(!armVmCommands[0]!.args.some((arg) => arg.includes("odin:")), "Windows ARM64 must not schedule unsupported Odin variants");
+assert(!armVmCommands[0]!.args.some((arg) => arg.includes("nim:")), "Windows ARM64 must not schedule unsupported Nim variants");
 const mainProcesses = [...VM_MAIN_PROCESSES];
 assertArray(
 	mainProcesses,
-	["bun", "cottontail", "zig", "rust", "go", "odin"],
+	["bun", "cottontail", "zig", "rust", "go", "odin", "nim"],
 	"VM tests should cover every main-process backend",
 );
 assertArray([...VM_WEBVIEWS], ["system", "cef"], "VM tests should cover both webviews");

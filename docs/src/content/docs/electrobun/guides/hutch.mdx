@@ -416,7 +416,8 @@ the complete boundary and external-bundler recipe.
 For Zig, Rust, Go, and Odin main processes, you don't need to install the
 compiler yourself. The selected Electrobun devkit declares a default exact
 version for each language; `build.zig.version`, `build.rust.version`,
-`build.go.version`, and `build.odin.version` can override it per project. Hutch
+`build.go.version`, `build.odin.version`, and `build.nim.version` can override
+it per project. Hutch
 accepts an exact matching system compiler when supported, otherwise downloads
 the selected toolchain into
 `~/.hutch/toolchains/<language>/<version>/<platform>` and shares it across

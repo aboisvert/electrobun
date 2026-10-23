@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import type { WindowsWebView2Permission } from "../../../config/windowsPermissions";
 
 export type BuildConfigType = {
-	mainProcess?: "bun" | "cottontail" | "zig" | "rust" | "go" | "odin";
+	mainProcess?: "bun" | "cottontail" | "zig" | "rust" | "go" | "odin" | "nim";
 	defaultRenderer: "native" | "cef";
 	availableRenderers: ("native" | "cef")[];
 	buildEnvironment?: RuntimeBuildChannel;

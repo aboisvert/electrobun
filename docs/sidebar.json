@@ -51,6 +51,10 @@
               {
                 "label": "Odin",
                 "link": "/electrobun/guides/hello-world-odin/"
+              },
+              {
+                "label": "Nim",
+                "link": "/electrobun/guides/hello-world-nim/"
               }
             ]
           },

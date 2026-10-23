@@ -15,6 +15,7 @@ const sources = {
 	zig: readSource("sdks/zig/electrobun.zig"),
 	go: readSource("sdks/go/electrobun.go"),
 	odin: readSource("sdks/odin/electrobun.odin"),
+	nim: readSource("sdks/nim/electrobun.nim"),
 	wrappers: {
 		darwin: readSource("native/macos/nativeWrapper.mm"),
 		linux: readSource("native/linux/nativeWrapper.cpp"),
@@ -193,6 +194,12 @@ const odinCoreTable = sourceSection(
 	"\n}",
 	"Odin ElectrobunCore symbol table",
 );
+const nimCoreTable = sourceSection(
+	sources.nim,
+	"Symbols* = object",
+	"proc loadSymbolsInto",
+	"Nim ElectrobunCore symbol table",
+);
 const typescriptWgpuBridge = sourceSection(
 	sources.typescript,
 	"export const WGPUBridge = {",
@@ -235,6 +242,13 @@ const eagerCoreDemands = {
 		captures(odinCoreTable, /^[\t ]+([A-Za-z_$][\w$]*)[\t ]*:(?!:)/gm).filter(
 			(symbol) => symbol !== "__handle",
 		),
+		100,
+	),
+	nim: requireContract(
+		"Nim ElectrobunCore symbol table",
+		captures(nimCoreTable, /^[\t ]+([A-Za-z_$][\w$]*)\*?:/gm)
+			.map((symbol) => symbol.replace(/\*$/, ""))
+			.filter((symbol) => symbol !== "handle"),
 		100,
 	),
 };

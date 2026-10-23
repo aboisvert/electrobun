@@ -167,6 +167,7 @@ Windows and Linux URL schemes and file associations are not yet implemented.
 | `rust` | `build.rust` | `Cargo.toml`, binary target `main` |
 | `go` | `build.go` | `go.mod`, package `./src/go` |
 | `odin` | `build.odin` | package containing `src/odin/main.odin` |
+| `nim` | `build.nim` | `src/nim/main.nim` (default entrypoint) |
 
 ```typescript
 import type { ElectrobunConfig } from "electrobun";
@@ -184,11 +185,11 @@ export default {
 } satisfies ElectrobunConfig;
 ```
 
-Each selected Electrobun release declares default Zig, Rust, Go, and Odin
+Each selected Electrobun release declares default Zig, Rust, Go, Odin, and Nim
 versions. The matching `build.zig.version`, `build.rust.version`,
-`build.go.version`, or `build.odin.version` field is an exact per-project
-override. Hutch reuses exact matching system compilers where supported, or
-stores the selected compiler under
+`build.go.version`, `build.odin.version`, or `build.nim.version` field is an
+exact per-project override. Hutch reuses exact matching system compilers where
+supported, or stores the selected compiler under
 `~/.hutch/toolchains/<language>/<version>/<platform>`.
 
 Native build descriptions remain project-owned:
@@ -203,6 +204,8 @@ Native build descriptions remain project-owned:
 - Odin: normal source package; `entrypoint` defaults to
   `src/odin/main.odin`, and Hutch passes the projected `electrobun_sdk`
   collection. No `build.odin` is generated or required.
+- Nim: `entrypoint` defaults to `src/nim/main.nim`; Hutch compiles with
+  `nim c --path:.hutch/devkit/nim-sdk`. No generated nimble file is required.
 
 Hutch invokes the normal project build tool. It does not generate `build.zig`,
 Cargo manifests, Go modules, or a temporary GOPATH.

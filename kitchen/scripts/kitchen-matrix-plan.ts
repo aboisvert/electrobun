@@ -5,6 +5,7 @@ export const KITCHEN_MAIN_PROCESSES = [
 	"rust",
 	"go",
 	"odin",
+	"nim",
 ] as const;
 
 export const KITCHEN_RENDERERS = ["native", "cef"] as const;
@@ -29,7 +30,8 @@ export function supportedKitchenMainProcesses(
 	arch: string = process.arch,
 ): KitchenMainProcess[] {
 	return KITCHEN_MAIN_PROCESSES.filter(
-		(main) => !(platform === "win32" && arch === "arm64" && main === "odin"),
+		(main) =>
+			!(platform === "win32" && arch === "arm64" && (main === "odin" || main === "nim")),
 	);
 }
 

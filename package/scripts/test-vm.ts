@@ -39,6 +39,7 @@ const displayNames: Record<(typeof VM_MAIN_PROCESSES)[number], string> = {
 	rust: "Rust",
 	go: "Go",
 	odin: "Odin",
+	nim: "Nim",
 };
 const webviewNames: Record<(typeof VM_WEBVIEWS)[number], string> = {
 	system: "system webview",

@@ -58,6 +58,7 @@ const expectedReleaseTasks = [
 	"test:version-bump",
 	"test:templates",
 	"test:odin-templates",
+	"test:nim-templates",
 	"test:template-publisher",
 	"test:signing",
 	"test:deployment-target",

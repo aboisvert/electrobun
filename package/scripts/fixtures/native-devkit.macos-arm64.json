@@ -31,6 +31,9 @@
 		"odin": {
 			"defaultVersion": "dev-2026-07a"
 		},
+		"nim": {
+			"defaultVersion": "2.2.12"
+		},
 		"bun": {
 			"defaultVersion": "1.4.4"
 		},
@@ -131,6 +134,10 @@
 				"entrypoint": "odin-sdk/electrobun/electrobun.odin",
 				"collection": "odin-sdk",
 				"collectionName": "electrobun_sdk"
+			},
+			"nim": {
+				"root": "nim-sdk",
+				"entrypoint": "nim-sdk/electrobun.nim"
 			}
 		}
 	}

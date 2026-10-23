@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { prepareLocalStack } from "./local-stack.js";
 import { selectHutchBinary } from "./hutch-launcher.mjs";
 
@@ -98,6 +98,21 @@ function formatCommand(command: DevCommand) {
 	return [command.command, ...command.args].map((value) => JSON.stringify(value)).join(" ");
 }
 
+export function resolveDevCommandEnvironment(
+	env: NodeJS.ProcessEnv | undefined,
+): NodeJS.ProcessEnv {
+	if (!env) {
+		return process.env;
+	}
+	if (typeof env.HUTCH_BINARY === "string" && env.HUTCH_BINARY.length > 0) {
+		const pinnedBinDir = dirname(env.HUTCH_BINARY);
+		const pathDelimiter = process.platform === "win32" ? ";" : ":";
+		const mergedPath = `${pinnedBinDir}${pathDelimiter}${process.env.PATH ?? ""}`;
+		return { ...process.env, ...env, PATH: mergedPath };
+	}
+	return { ...process.env, ...env };
+}
+
 function formatExitStatus(status: number | null) {
 	const value = status ?? 1;
 	return process.platform === "win32"
@@ -109,7 +124,7 @@ export function runCommand(command: DevCommand): void {
 	console.log(`[dev] ${command.label}...`);
 	const result = spawnSync(command.command, command.args, {
 		cwd: command.cwd,
-		env: command.env ? { ...process.env, ...command.env } : process.env,
+		env: resolveDevCommandEnvironment(command.env),
 		stdio: "inherit",
 	});
 
@@ -144,7 +159,7 @@ export async function runCommandWithSignalForwarding(
 	console.log(`[dev] ${command.label}...`);
 	const child = spawn(command.command, command.args, {
 		cwd: command.cwd,
-		env: command.env ? { ...process.env, ...command.env } : process.env,
+		env: resolveDevCommandEnvironment(command.env),
 		stdio: options.onOutput ? ["inherit", "pipe", "pipe"] : "inherit",
 	});
 	let outputError: Error | null = null;

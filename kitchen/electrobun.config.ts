@@ -44,6 +44,9 @@ export default {
 		odin: {
 			entrypoint: "src/odin/main.odin",
 		},
+		nim: {
+			entrypoint: "src/nim/main.nim",
+		},
 		cottontail: {
 			entrypoint: "src/bun/index.ts",
 		},

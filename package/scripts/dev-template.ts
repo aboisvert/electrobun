@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { assertStrictSemVer } from "../src/shared/strict-semver.js";
 import { validateNativeDevkitManifest } from "./validate-native-devkit.mjs";
 import {
+	resolveDevCommandEnvironment,
 	resolveHutchBinary,
 	runCommandWithSignalForwarding,
 	type DevCommand,
@@ -235,7 +236,7 @@ export async function runCommandAndCaptureWithSignalForwarding(
 	console.log(`[dev] ${command.label}...`);
 	const child = spawn(command.command, command.args, {
 		cwd: command.cwd,
-		env: command.env ? { ...process.env, ...command.env } : process.env,
+		env: resolveDevCommandEnvironment(command.env),
 		stdio: ["inherit", "pipe", "inherit"],
 	});
 	let output = "";
@@ -334,6 +335,28 @@ export function resolvedHutchEnginePath(output: string): string {
 	return path;
 }
 
+export function pinnedHutchLauncherFromEngine(hutchEngineBinary: string): string {
+	const launcher = join(
+		dirname(hutchEngineBinary),
+		process.platform === "win32" ? "hutch.exe" : "hutch",
+	);
+	if (!isFile(launcher)) {
+		throw new Error(
+			`Pinned Hutch launcher not found next to engine at ${launcher}`,
+		);
+	}
+	return launcher;
+}
+
+export function readTemplateMainProcess(templateDir: string): string | undefined {
+	const configPath = join(templateDir, "electrobun.config.ts");
+	if (!existsSync(configPath)) {
+		return undefined;
+	}
+	const source = readFileSync(configPath, "utf8");
+	return /mainProcess:\s*["'](\w+)["']/.exec(source)?.[1];
+}
+
 export function createTemplateDevPlan(options: {
 	hutchBinary: string;
 	hutchEngineBinary: string;
@@ -362,30 +385,35 @@ export function createTemplateDevPlan(options: {
 	if (!isAbsolute(options.hutchEngineBinary)) {
 		throw new Error("Template development Hutch engine path must be absolute");
 	}
+	const templateHutchBinary = pinnedHutchLauncherFromEngine(
+		options.hutchEngineBinary,
+	);
 	const localDevkitEnvironment = {
 		HUTCH_ELECTROBUN_DEVKIT_ROOT: devkitRoot,
 		HUTCH_DEFAULT_ELECTROBUN: version,
 		HUTCH_DEFAULT_CLI: hutchPins.cli,
 		HUTCH_ENGINE_BINARY: options.hutchEngineBinary,
+		HUTCH_BINARY: templateHutchBinary,
 	};
 
 	return {
 		build: {
 			label: "Build Electrobun package",
-			command: options.hutchBinary,
+			command: templateHutchBinary,
 			args: [join(packageDir, "build.ts")],
 			cwd: packageDir,
+			env: { ...localDevkitEnvironment },
 		},
 		verifyCli: {
 			label: "Verify template Hutch CLI",
-			command: options.hutchBinary,
+			command: options.hutchEngineBinary,
 			args: ["--version"],
 			cwd: templateDir,
 			env: { ...localDevkitEnvironment },
 		},
 		verifyCottontail: {
 			label: "Verify template Cottontail",
-			command: options.hutchBinary,
+			command: templateHutchBinary,
 			args: [
 				"-e",
 				'process.stdout.write(process.versions.cottontail ?? "")',
@@ -395,14 +423,14 @@ export function createTemplateDevPlan(options: {
 		},
 		install: {
 			label: "Install template dependencies",
-			command: options.hutchBinary,
+			command: templateHutchBinary,
 			args: ["run", "--if-configured", "install"],
 			cwd: templateDir,
 			env: { ...localDevkitEnvironment },
 		},
 		dev: {
 			label: "Launch template development app",
-			command: options.hutchBinary,
+			command: templateHutchBinary,
 			args: ["run", "dev"],
 			cwd: templateDir,
 			env: { ...localDevkitEnvironment },
@@ -463,6 +491,19 @@ async function main(): Promise<void> {
 		version: packageVersion,
 		hutchPins,
 	});
+
+	if (readTemplateMainProcess(templateDir) === "nim") {
+		plan.dev = {
+			label: "Launch template development app",
+			command: process.execPath,
+			args: [
+				join(packageDir, "scripts", "run-nim-template-dev.mjs"),
+				templateName,
+			],
+			cwd: packageDir,
+			env: plan.dev.env,
+		};
+	}
 
 	console.log(`[dev:template] Template: ${templateName}`);
 	console.log(`[dev:template] Electrobun: ${packageVersion}`);

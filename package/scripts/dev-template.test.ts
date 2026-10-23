@@ -112,15 +112,21 @@ function writeDevkit(packageDir: string): DevkitFixture {
 try {
 	assert.match(
 		readFileSync(resolve(import.meta.dirname, "..", "hutch.config.ts"), "utf8"),
-		/"dev:template": \["hutch", "scripts\/dev-template\.ts"\]/,
+		/"dev:template": \[\s*"node",\s*"--experimental-strip-types",\s*"scripts\/dev-template\.ts",\s*\]/,
 	);
 
 	const packageDir = join(scratch, "work tree", "electrobun", "package");
 	const templatesDir = join(scratch, "work tree", "electrobun", "templates");
 	mkdirSync(join(packageDir, "dist"), { recursive: true });
 	const hutchEngineBinary = join(packageDir, "tools", "hutch-engine");
+	const pinnedHutchBinary = join(
+		packageDir,
+		"tools",
+		process.platform === "win32" ? "hutch.exe" : "hutch",
+	);
 	mkdirSync(dirname(hutchEngineBinary), { recursive: true });
 	writeFileSync(hutchEngineBinary, "fixture\n");
+	writeFileSync(pinnedHutchBinary, "fixture\n");
 	mkdirSync(templatesDir, { recursive: true });
 	const validTemplate = createTemplate(templatesDir, "hello-world");
 	createTemplate(templatesDir, "angular");
@@ -220,17 +226,32 @@ try {
 	});
 	assert.deepEqual(plan.build, {
 		label: "Build Electrobun package",
-		command: "/tools/hutch",
+		command: pinnedHutchBinary,
 		args: [join(resolve(packageDir), "build.ts")],
 		cwd: resolve(packageDir),
+		env: {
+			HUTCH_ELECTROBUN_DEVKIT_ROOT: join(resolve(packageDir), "dist"),
+			HUTCH_DEFAULT_ELECTROBUN: "2.0.1-beta.31",
+			HUTCH_DEFAULT_CLI: "0.24.3",
+			HUTCH_ENGINE_BINARY: hutchEngineBinary,
+			HUTCH_BINARY: pinnedHutchBinary,
+		},
+	});
+	assert.equal(plan.verifyCli.command, hutchEngineBinary);
+	assert.equal(plan.verifyCli.cwd, resolve(validTemplate));
+	assert.deepEqual(plan.verifyCli.env, {
+		HUTCH_ELECTROBUN_DEVKIT_ROOT: join(resolve(packageDir), "dist"),
+		HUTCH_DEFAULT_ELECTROBUN: "2.0.1-beta.31",
+		HUTCH_DEFAULT_CLI: "0.24.3",
+		HUTCH_ENGINE_BINARY: hutchEngineBinary,
+		HUTCH_BINARY: pinnedHutchBinary,
 	});
 	for (const command of [
-		plan.verifyCli,
 		plan.verifyCottontail,
 		plan.install,
 		plan.dev,
 	]) {
-		assert.equal(command.command, "/tools/hutch");
+		assert.equal(command.command, pinnedHutchBinary);
 		assert.equal(command.cwd, resolve(validTemplate));
 		assert.deepEqual(command.env, {
             ...(command === plan.verifyCottontail ? { HUTCH_RUNTIME: "cottontail" } : {}),
@@ -238,6 +259,7 @@ try {
 			HUTCH_DEFAULT_ELECTROBUN: "2.0.1-beta.31",
 			HUTCH_DEFAULT_CLI: "0.24.3",
 			HUTCH_ENGINE_BINARY: hutchEngineBinary,
+			HUTCH_BINARY: pinnedHutchBinary,
 		});
 	}
 	assert.deepEqual(plan.expectedHutch, {
@@ -263,6 +285,7 @@ try {
 			HUTCH_ELECTROBUN_DEVKIT_ROOT: join(resolve(packageDir), "dist"),
 			HUTCH_DEFAULT_ELECTROBUN: "2.0.1-beta.31",
 			HUTCH_ENGINE_BINARY: hutchEngineBinary,
+			HUTCH_BINARY: pinnedHutchBinary,
 		},
 	);
 	assert.equal(

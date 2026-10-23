@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { goHostTuple, rustHostTriple, verifyGoToolchain, verifyRustToolchain } from "./vendored-toolchain-host";
+import { goHostTuple, rustHostTriple, verifyGoToolchain, verifyNimToolchain, verifyRustToolchain } from "./vendored-toolchain-host";
 
 const rustReport = (host: string, version = "1.88.0") =>
 	`rustc ${version} (6b00bc388 2025-06-23)\r\nbinary: rustc\r\nhost: ${host}\r\nrelease: ${version}\r\nLLVM version: 20.1.5\r\n`;
@@ -26,6 +26,11 @@ test("compiler host validation rejects wrong operating systems, versions, and in
 	for (const report of ["go version go1.26.4 linux/arm64", "go version go1.26.3 windows/arm64", "go version go1.26.4"]) {
 		expect(() => verifyGoToolchain(report, "1.26.4", host)).toThrow();
 	}
+});
+
+test("Nim host validation rejects wrong versions and incomplete reports", () => {
+	expect(() => verifyNimToolchain("Nim Compiler Version 2.2.11 [MacOSX: arm64]", "2.2.12")).toThrow();
+	expect(() => verifyNimToolchain("Nim Compiler Version 2.2.12 [MacOSX: arm64]", "2.2.12")).not.toThrow();
 });
 
 test("compiler downloads use the host architecture across supported operating systems", () => {

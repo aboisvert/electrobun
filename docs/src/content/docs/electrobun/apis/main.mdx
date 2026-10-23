@@ -1,11 +1,11 @@
 ---
 title: "Main Process API"
-description: "The Electrobun main-process SDK in Cottontail, Bun, Zig, Rust, Go, and Odin."
+description: "The Electrobun main-process SDK in Cottontail, Bun, Zig, Rust, Go, Odin, and Nim."
 ---
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
 
-Electrobun exposes the same native core to **six main-process runtimes**:
-Bun (the default), Cottontail (experimental), Zig, Rust, Go, and Odin. The TypeScript SDK
+Electrobun exposes the same native core to **seven main-process runtimes**:
+Bun (the default), Cottontail (experimental), Zig, Rust, Go, Odin, and Nim. The TypeScript SDK
 (`electrobun/main`) serves Cottontail and Bun; each native language has its
 own SDK that loads `ElectrobunCore` directly. Pick your runtime once — code
 snippets across these docs follow your selection.
@@ -148,6 +148,26 @@ electrobun.createWebview(core, webview_options)
 ```
 
 </TabItem>
+<TabItem label="Nim">
+
+```nim
+# src/nim/main.nim — import electrobun from the projected nim-sdk on --path.
+# Windows are created from a worker thread while runMainThread blocks.
+# Full setup in the Nim hello world.
+import electrobun
+
+# ...inside the UI thread, after configureWebviewRuntimeFromExecutableDir:
+var windowOptions = defaultWindowOptions("My app")
+windowOptions.frame = Rect(x: 160.0, y: 100.0, width: 800.0, height: 600.0)
+let (windowId, _) = core.createWindow(windowOptions)
+
+var webviewOptions = defaultWebviewOptions(windowId)
+webviewOptions.url = "views://mainview/index.html"
+webviewOptions.frame = Rect(x: 0.0, y: 0.0, width: 800.0, height: 600.0)
+discard core.createWebview(webviewOptions)
+```
+
+</TabItem>
 </Tabs>
 
 <Aside type="note">
@@ -186,23 +206,23 @@ The TypeScript SDK has the broadest high-level surface. The native SDKs
 mirror the core contract procedurally (ids + callbacks instead of classes).
 What exists where:
 
-| API area | Cottontail | Bun | Zig | Rust | Go | Odin |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: |
-| Windows & webviews | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| WGPU views (native GPU surfaces) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Application & context menus | ✓ typed | ✓ typed | JSON | JSON | JSON | JSON |
-| Tray (create/show/title) | ✓ + events | ✓ + events | ✓ ¹ | ✓ ¹ | ✓ + clicks | ✓ ¹ |
-| Dialogs, message box, notifications | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Clipboard, displays, shell open/reveal/trash | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Sessions & cookies | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Global shortcuts | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| [Paths](/electrobun/apis/paths/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Typed RPC (`createRPC`) | ✓ | ✓ | raw bridge ² | raw bridge ² | raw bridge ² | raw bridge ² |
-| [Updater](/electrobun/apis/updater/) | ✓ | ✓ | — | — | — | — |
-| [Warren UI](/electrobun/apis/ui/overview/) (`main/ui`) | ✓ | ✓ | — | — | — | — |
-| three.js / Babylon WebGPU adapters | ✓ | ✓ | — | — | — | — |
+| API area | Cottontail | Bun | Zig | Rust | Go | Odin | Nim |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| Windows & webviews | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| WGPU views (native GPU surfaces) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Application & context menus | ✓ typed | ✓ typed | JSON | JSON | JSON | JSON | JSON |
+| Tray (create/show/title) | ✓ + events | ✓ + events | ✓ ¹ | ✓ ¹ | ✓ + clicks | ✓ ¹ | ✓ ¹ |
+| Dialogs, message box, notifications | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Clipboard, displays, shell open/reveal/trash | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Sessions & cookies | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Global shortcuts | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [Paths](/electrobun/apis/paths/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Typed RPC (`createRPC`) | ✓ | ✓ | raw bridge ² | raw bridge ² | raw bridge ² | raw bridge ² | raw bridge ² |
+| [Updater](/electrobun/apis/updater/) | ✓ | ✓ | — | — | — | — | — |
+| [Warren UI](/electrobun/apis/ui/overview/) (`main/ui`) | ✓ | ✓ | — | — | — | — | — |
+| three.js / Babylon WebGPU adapters | ✓ | ✓ | — | — | — | — | — |
 
-¹ Zig, Rust, and Odin create and manage tray items, but their wrappers do
+¹ Zig, Rust, Odin, and Nim create and manage tray items, but their wrappers do
 not yet surface tray click events; Go's `TrayOptions.Handler` does receive
 them. Tray menus remain TypeScript-only everywhere.
 ² Native SDKs exchange raw JSON messages with `Electroview` in the webview

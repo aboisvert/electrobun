@@ -58,6 +58,9 @@ describe("exit on last window closed contract", () => {
 		expect(read("sdks/odin/electrobun.odin")).toContain(
 			"setExitOnLastWindowClosed:              SetBoolFn,",
 		);
+		expect(read("sdks/nim/electrobun.nim")).toContain(
+			'symAddr(handle, "setExitOnLastWindowClosed")',
+		);
 	});
 
 	it("exposes the toggle in every language SDK", () => {
@@ -72,6 +75,9 @@ describe("exit on last window closed contract", () => {
 		);
 		expect(read("sdks/odin/electrobun.odin")).toContain(
 			"setExitOnLastWindowClosed :: proc(self: ^Core, enabled: bool) -> Error",
+		);
+		expect(read("sdks/nim/electrobun.nim")).toContain(
+			"proc setExitOnLastWindowClosed*(self: Core; enabled: bool): EbError",
 		);
 	});
 
@@ -89,6 +95,11 @@ describe("exit on last window closed contract", () => {
 		expect(odin).toContain(
 			"exitOnLastWindowClosedFromBuildConfig(allocator, &bundle_paths)",
 		);
+
+		const nim = read("sdks/nim/electrobun.nim");
+		expect(nim).toContain('joinPath(bundlePaths.resourcesDir, "build.json")');
+		expect(nim).toContain('"exitOnLastWindowClosed"');
+		expect(nim).toContain("exitOnLastWindowClosedFromBuildConfig");
 
 		const go = read("sdks/go/electrobun.go");
 		expect(go).toContain('filepath.Join(bundlePaths.ResourcesDir, "build.json")');
@@ -140,6 +151,12 @@ describe("exit on last window closed contract", () => {
 		expect(odin).toContain(
 			"core.symbols.setQuitRequestedHandler(quit_requested_trampoline)",
 		);
+
+		const nim = read("sdks/nim/electrobun.nim");
+		expect(nim).toContain("gQuitRequestedStopEventLoop = core.symbols.stopEventLoop");
+		expect(nim).toContain(
+			"core.symbols.setQuitRequestedHandler(quitRequestedTrampoline)",
+		);
 	});
 
 	it("keeps a user handler ahead of the default", () => {
@@ -152,6 +169,9 @@ describe("exit on last window closed contract", () => {
 		expect(read("sdks/odin/electrobun.odin")).toContain(
 			"if g_quit_requested_user_handler != nil {",
 		);
+		expect(read("sdks/nim/electrobun.nim")).toContain(
+			"if not gQuitRequestedUserHandler.isNil:",
+		);
 	});
 
 	it("stops the render loop of every native wgpu template on window close", () => {
@@ -162,6 +182,7 @@ describe("exit on last window closed contract", () => {
 			"odin-jelly-bunny-wgpu/src/odin/main.odin",
 			"odin-particles-wgpu/src/odin/main.odin",
 			"odin-tree-wgpu/src/odin/main.odin",
+			"nim-particles-wgpu/src/nim/main.nim",
 			"go-maze-wgpu/src/go/main.go",
 			"rust-flock-wgpu/src/main.rs",
 		];

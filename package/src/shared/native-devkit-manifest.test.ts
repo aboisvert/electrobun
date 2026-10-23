@@ -14,6 +14,7 @@ import {
 } from "./native-devkit-manifest";
 import { GO_VERSION } from "./go-version";
 import { ODIN_VERSION } from "./odin-version";
+import { NIM_VERSION } from "./nim-version";
 import { RUST_VERSION } from "./rust-version";
 import { ZIG_VERSION } from "./build-dependencies";
 import { BUN_VERSION } from "./bun-version";
@@ -161,6 +162,7 @@ describe("native devkit manifest", () => {
 			rust: { defaultVersion: RUST_VERSION },
 			go: { defaultVersion: GO_VERSION },
 			odin: { defaultVersion: ODIN_VERSION },
+			nim: { defaultVersion: NIM_VERSION },
 			bun: { defaultVersion: BUN_VERSION },
 			cottontail: { defaultVersion: COTTONTAIL_VERSION },
 		});
@@ -169,6 +171,7 @@ describe("native devkit manifest", () => {
 			"rust",
 			"go",
 			"odin",
+			"nim",
 			"bun",
 			"cottontail",
 		]);
@@ -198,6 +201,11 @@ describe("native devkit manifest", () => {
 	it("marks Odin unsupported on Windows ARM64", () => {
 		const manifest = createNativeDevkitManifest({ productVersion: "2.0.3-beta.0", target: { os: "win", arch: "arm64" } });
 		expect(manifest.layout.sdks.odin.supported).toBe(false);
+	});
+
+	it("marks Nim unsupported on Windows ARM64", () => {
+		const manifest = createNativeDevkitManifest({ productVersion: "2.0.3-beta.0", target: { os: "win", arch: "arm64" } });
+		expect(manifest.layout.sdks.nim.supported).toBe(false);
 	});
 
 	for (const { target, expected } of targets) {
@@ -238,6 +246,10 @@ describe("native devkit manifest", () => {
 			entrypoint: "odin-sdk/electrobun/electrobun.odin",
 			collection: "odin-sdk",
 			collectionName: "electrobun_sdk",
+		});
+		expect(manifest.layout.sdks.nim).toEqual({
+			root: "nim-sdk",
+			entrypoint: "nim-sdk/electrobun.nim",
 		});
 	});
 

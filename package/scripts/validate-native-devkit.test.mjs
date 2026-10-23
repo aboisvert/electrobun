@@ -60,6 +60,7 @@ function makeCore(manifest = fixture()) {
 		"go-sdk",
 		"odin-sdk",
 		"odin-sdk/electrobun",
+		"nim-sdk",
 	]);
 
 	for (const path of declaredPaths(manifest)) {

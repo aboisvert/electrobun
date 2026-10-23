@@ -35,3 +35,14 @@ export function verifyGoToolchain(output: string, version: string, host: Toolcha
 		throw new Error(`Vendored Go mismatch: expected go${version} for ${expectedHost}, got ${actual?.[1] ?? "unknown version"} for ${actual?.[2] ?? "unknown host"}`);
 	}
 }
+
+export function verifyNimToolchain(output: string, version: string): void {
+	const firstLine = output.split(/\r?\n/, 1)[0]?.trim() ?? "";
+	const match = firstLine.match(/^Nim Compiler Version (\d+\.\d+\.\d+)/);
+	const actualVersion = match?.[1];
+	if (actualVersion !== version) {
+		throw new Error(
+			`Vendored Nim mismatch: expected Nim Compiler Version ${version}, got "${firstLine}"`,
+		);
+	}
+}

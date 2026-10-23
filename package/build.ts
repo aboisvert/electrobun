@@ -37,9 +37,10 @@ import {
 import { RUST_VERSION } from "./src/shared/rust-version";
 import { GO_VERSION } from "./src/shared/go-version";
 import { ODIN_VERSION } from "./src/shared/odin-version";
+import { NIM_VERSION } from "./src/shared/nim-version";
 import { ELECTROBUN_VERSION } from "./src/shared/electrobun-version";
 import { resolveBuildArch, windowsBuildTarget } from "./src/shared/windows-build-target";
-import { goHostTuple, rustHostTriple, verifyGoToolchain, verifyRustToolchain } from "./src/shared/vendored-toolchain-host";
+import { goHostTuple, rustHostTriple, verifyGoToolchain, verifyNimToolchain, verifyRustToolchain } from "./src/shared/vendored-toolchain-host";
 import { assertWindowsBinaryArchitecture } from "./scripts/windows-binary-architecture.mjs";
 import { zigCompilerHostArchitecture } from "./scripts/zig-compiler-host.mjs";
 import {
@@ -79,6 +80,9 @@ const { values: args } = parseArgs({
 		"vendor-go-only": {
 			type: "boolean",
 		},
+		"vendor-nim-only": {
+			type: "boolean",
+		},
 		arch: { type: "string" },
 		npm: {
 			type: "boolean",
@@ -104,6 +108,7 @@ const rustBinary = OS === "win" ? "rustc.exe" : "rustc";
 const cargoBinary = OS === "win" ? "cargo.exe" : "cargo";
 const goBinary = OS === "win" ? "go.exe" : "go";
 const odinBinary = OS === "win" ? "odin.exe" : "odin";
+const nimBinary = OS === "win" ? "nim.exe" : "nim";
 const macosClangTargetFlags = [
 	"-arch",
 	macosNativeArchitecture(ARCH),
@@ -127,6 +132,9 @@ const PATH = {
 	odin: {
 		BIN: join(process.cwd(), "vendors", "odin", odinBinary),
 	},
+	nim: {
+		BIN: join(process.cwd(), "vendors", "nim", "bin", nimBinary),
+	},
 };
 
 // Minimum expected file sizes for downloaded archives (in bytes)
@@ -141,6 +149,7 @@ const MIN_DOWNLOAD_SIZES: Record<string, number> = {
 	rust: 100 * 1024 * 1024, // Rust toolchain tarball should be > 100MB
 	go: 50 * 1024 * 1024, // Go toolchain archive should be > 50MB
 	odin: 30 * 1024 * 1024, // Odin toolchain archive should be > 30MB
+	nim: 5 * 1024 * 1024, // Nim toolchain archive should be > 5MB
 };
 
 function validateDownload(filePath: string, type: string): void {
@@ -222,7 +231,7 @@ function outputMissingOrOlder(outputPath: string, inputPaths: string[]): boolean
 
 // TODO: setup file watchers
 try {
-	if (args["vendor-rust-only"] || args["vendor-go-only"]) {
+	if (args["vendor-rust-only"] || args["vendor-go-only"] || args["vendor-nim-only"]) {
 		// Core release archives deliberately omit SDK compilers. Allow native
 		// regression gates to provision this exact toolchain without building
 		// Electrobun again or downloading the other SDK toolchains.
@@ -233,6 +242,10 @@ try {
 		if (args["vendor-go-only"]) {
 			console.log(`Preparing pinned Go ${GO_VERSION} only...`);
 			await vendorGo();
+		}
+		if (args["vendor-nim-only"]) {
+			console.log(`Preparing pinned Nim ${NIM_VERSION} only...`);
+			await vendorNim();
 		}
 	} else if (IS_NPM_BUILD) {
 		console.log("Building for npm (JS/TS files only)...");
@@ -690,6 +703,7 @@ async function setup() {
 		await vendorRust(); // static.rust-lang.org
 		await vendorGo(); // go.dev
 		if (!(OS === "win" && ARCH === "arm64")) await vendorOdin(); // No Windows ARM64 Odin toolchain.
+		if (!(OS === "win" && ARCH === "arm64")) await vendorNim(); // No Windows ARM64 Nim prebuilt.
 	}
 	await vendorCEF(); // Spotify CDN (not GitHub)
 	await vendorWebview2();
@@ -765,6 +779,10 @@ async function copyApiFiles() {
 	rmSync("dist/odin-sdk/electrobun", { recursive: true, force: true });
 	mkdirSync("dist/odin-sdk/electrobun", { recursive: true });
 	cpSync("src/sdks/odin/electrobun.odin", "dist/odin-sdk/electrobun/electrobun.odin", {
+		force: true,
+	});
+	mkdirSync("dist/nim-sdk", { recursive: true });
+	cpSync("src/sdks/nim/electrobun.nim", "dist/nim-sdk/electrobun.nim", {
 		force: true,
 	});
 }
@@ -1429,6 +1447,106 @@ async function vendorOdin() {
 	} catch (error) {
 		console.error("Failed to vendor Odin:", error);
 		throw new Error("Could not vendor Odin toolchain.");
+	} finally {
+		await $`rm -f "${tempArchive}"`.catch(() => {});
+		await $`rm -rf "${tempExtractDir}"`.catch(() => {});
+	}
+}
+
+function getNimReleaseAssetName(): string {
+	// Official prebuilt releases: https://nim-lang.org/download.html
+	// Coverage for 2.2.12: macOS x64/arm64, Linux x64/arm64, Windows x64 zip.
+	// There is no windows-arm64 prebuilt.
+	if (OS === "macos") {
+		const nimArch = ARCH === "arm64" ? "arm64" : "x64";
+		return `nim-${NIM_VERSION}-macosx_${nimArch}.tar.xz`;
+	}
+	if (OS === "linux") {
+		const nimArch = ARCH === "arm64" ? "arm64" : "x64";
+		return `nim-${NIM_VERSION}-linux_${nimArch}.tar.xz`;
+	}
+	if (OS === "win") {
+		if (ARCH === "arm64") {
+			throw new Error(
+				"Nim does not publish windows-arm64 prebuilt toolchains. Nim main processes are only supported on x64 Windows.",
+			);
+		}
+		return `nim-${NIM_VERSION}_x64.zip`;
+	}
+	throw new Error(`Unsupported platform for Nim toolchain: ${OS}`);
+}
+
+async function verifyVendoredNim() {
+	const versionOutput = runCaptured(PATH.nim.BIN, ["--version"]).trim();
+	verifyNimToolchain(versionOutput, NIM_VERSION);
+}
+
+async function vendorNim() {
+	const nimDir = join(process.cwd(), "vendors", "nim");
+	const nimVersionFile = join(nimDir, ".nim-version");
+
+	if (existsSync(PATH.nim.BIN)) {
+		if (existsSync(nimVersionFile)) {
+			const vendoredVersion = readFileSync(nimVersionFile, "utf-8").trim();
+			if (vendoredVersion === NIM_VERSION) {
+				await verifyVendoredNim();
+				return;
+			}
+			console.log(
+				`Nim version mismatch: vendored "${vendoredVersion}" vs expected "${NIM_VERSION}"`,
+			);
+		} else {
+			try {
+				await verifyVendoredNim();
+				writeFileSync(nimVersionFile, NIM_VERSION);
+				return;
+			} catch {
+				console.log("Nim vendor directory found without a valid version stamp.");
+			}
+		}
+
+		console.log("Cleaning stale Nim toolchain and re-vendoring...");
+		await $`rm -rf ${nimDir}`;
+	}
+
+	const assetName = getNimReleaseAssetName();
+	const tempArchive = join("vendors", assetName);
+	const tempExtractDir = join("vendors", "nim-extract-temp");
+	const nimUrl = `https://nim-lang.org/download/${assetName}`;
+
+	try {
+		await $`mkdir -p vendors`;
+		await $`rm -rf ${tempExtractDir}`;
+		console.log(`Downloading Nim ${NIM_VERSION} (${assetName})...`);
+		await $`curl -L "${nimUrl}" -o "${tempArchive}"`;
+		validateDownload(tempArchive, "nim");
+
+		mkdirSync(tempExtractDir, { recursive: true });
+		if (OS === "win") {
+			await $`powershell -ExecutionPolicy Bypass -Command Expand-Archive -Path "${tempArchive}" -DestinationPath "${tempExtractDir}" -Force`;
+		} else {
+			await $`tar -xJf "${tempArchive}" -C "${tempExtractDir}"`;
+		}
+
+		const entries = readdirSync(tempExtractDir, { withFileTypes: true });
+		const topLevelDirs = entries.filter((entry) => entry.isDirectory());
+		const extractedRoot =
+			entries.length === 1 && topLevelDirs.length === 1
+				? join(tempExtractDir, topLevelDirs[0].name)
+				: tempExtractDir;
+
+		await $`rm -rf ${nimDir}`;
+		renameSync(extractedRoot, nimDir);
+		if (OS !== "win") {
+			chmodSync(PATH.nim.BIN, 0o755);
+		}
+
+		await verifyVendoredNim();
+		writeFileSync(nimVersionFile, NIM_VERSION);
+		console.log("✓ Nim toolchain vendored successfully");
+	} catch (error) {
+		console.error("Failed to vendor Nim:", error);
+		throw new Error("Could not vendor Nim toolchain.");
 	} finally {
 		await $`rm -f "${tempArchive}"`.catch(() => {});
 		await $`rm -rf "${tempExtractDir}"`.catch(() => {});

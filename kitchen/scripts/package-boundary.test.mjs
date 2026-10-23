@@ -49,6 +49,7 @@ test("Kitchen resolves tasks and SDK types through Hutch", () => {
 	assert.deepEqual(scriptNames, [
 		"build:canary",
 		"build:stable",
+		"check:nim-mirrors",
 		"check:odin-mirrors",
 		"check:zig-mirrors",
 		"dev",
@@ -60,6 +61,7 @@ test("Kitchen resolves tasks and SDK types through Hutch", () => {
 		"start",
 		"start:canary",
 		"test:go-webview-observations",
+		"test:nim-webview-observations",
 		"test:rust-webview-observations",
 		"test:tooling",
 		"test:zig-webview-observations",
@@ -72,6 +74,7 @@ test("Kitchen resolves tasks and SDK types through Hutch", () => {
 		'"matrix:full": ["hutch", "scripts/kitchen-matrix.ts", "--full"]',
 		'"check:zig-mirrors": ["hutch", "scripts/check-zig-test-mirrors.ts"]',
 		'"check:odin-mirrors": ["hutch", "scripts/check-odin-test-mirrors.ts"]',
+		'"check:nim-mirrors": ["hutch", "scripts/check-nim-mirrors.ts"]',
 		'"start:canary": ["hutch", "electrobun", "dev", "--env=canary"]',
 	]) {
 		assert.match(hutch, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

@@ -1,0 +1,417 @@
+#!/usr/bin/env node
+
+import { spawnSync } from "node:child_process";
+import {
+	chmodSync,
+	copyFileSync,
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { selectHutchBinary } from "./hutch-launcher.mjs";
+
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repositoryRoot = resolve(packageRoot, "..");
+
+function usage() {
+	console.log(`Usage: node scripts/run-nim-template-dev.mjs <template-name> [options]
+
+Build and run a Nim Electrobun template against the local package devkit.
+
+Options:
+  --hutch         Use Hutch (electrobun sync/build/run) instead of a repo-local bundle
+  --build-only    Stage and compile without launching the app
+  --no-devkit-build
+                  Do not run package build.ts when dist/ is incomplete
+  -h, --help      Show this help
+`);
+}
+
+function parseArgs(argv) {
+	let templateName = "";
+	const options = {
+		hutch: false,
+		buildOnly: false,
+		devkitBuild: true,
+		help: false,
+	};
+	for (const arg of argv) {
+		if (arg === "--hutch") options.hutch = true;
+		else if (arg === "--build-only") options.buildOnly = true;
+		else if (arg === "--no-devkit-build") options.devkitBuild = false;
+		else if (arg === "-h" || arg === "--help") options.help = true;
+		else if (!templateName) templateName = arg;
+		else throw new Error(`Unknown argument: ${arg}`);
+	}
+	if (!templateName && !options.help) {
+		throw new Error("Missing template name.");
+	}
+	return { templateName, options };
+}
+
+function run(logPrefix, label, command, args, cwd, env = process.env) {
+	console.log(`[${logPrefix}] ${label}...`);
+	const result = spawnSync(command, args, { cwd, env, stdio: "inherit" });
+	if (result.error) throw result.error;
+	if (result.status !== 0) {
+		throw new Error(
+			`${label} failed with exit code ${result.status ?? "unknown"}`,
+		);
+	}
+}
+
+function coreLibFileName(platform) {
+	if (platform === "win32") return "ElectrobunCore.dll";
+	if (platform === "darwin") return "libElectrobunCore.dylib";
+	return "libElectrobunCore.so";
+}
+
+function nativeWrapperFileName(platform) {
+	if (platform === "win32") return "libNativeWrapper.dll";
+	if (platform === "darwin") return "libNativeWrapper.dylib";
+	return "libNativeWrapper.so";
+}
+
+function asarLibFileName(platform) {
+	if (platform === "win32") return "libasar.dll";
+	if (platform === "darwin") return "libasar.dylib";
+	return "libasar.so";
+}
+
+function runtimeLibraryFileNames(platform) {
+	return [
+		coreLibFileName(platform),
+		nativeWrapperFileName(platform),
+		asarLibFileName(platform),
+	];
+}
+
+function copyRuntimeLibraries(dist, destDir) {
+	for (const name of runtimeLibraryFileNames(process.platform)) {
+		cpSync(join(dist, name), join(destDir, name));
+	}
+}
+
+function resolveNimBinary() {
+	const vendored = join(
+		packageRoot,
+		"vendors",
+		"nim",
+		"bin",
+		process.platform === "win32" ? "nim.exe" : "nim",
+	);
+	if (existsSync(vendored)) return vendored;
+	return process.platform === "win32" ? "nim.exe" : "nim";
+}
+
+function bunRunEnvironment() {
+	const env = { ...process.env };
+	if (!env.ASDF_BUN_VERSION) {
+		env.ASDF_BUN_VERSION = "1.4.2";
+	}
+	return env;
+}
+
+function resolveBunBinary() {
+	const local = join(
+		packageRoot,
+		"node_modules",
+		".bin",
+		process.platform === "win32" ? "bun.exe" : "bun",
+	);
+	if (existsSync(local)) return local;
+	const asdfShim = join(
+		process.env.HOME ?? "",
+		".asdf",
+		"shims",
+		process.platform === "win32" ? "bun.exe" : "bun",
+	);
+	if (asdfShim && existsSync(asdfShim)) return asdfShim;
+	return process.platform === "win32" ? "bun.exe" : "bun";
+}
+
+function resolveSdkPath() {
+	const built = join(packageRoot, "dist", "nim-sdk", "electrobun.nim");
+	if (existsSync(built)) return join(packageRoot, "dist", "nim-sdk");
+	return join(packageRoot, "src", "sdks", "nim");
+}
+
+function distRequirements(platform) {
+	const dist = join(packageRoot, "dist");
+	return [
+		...runtimeLibraryFileNames(platform).map((name) => join(dist, name)),
+		join(dist, "preload-full.js"),
+		join(dist, "preload-sandboxed.js"),
+		join(dist, "nim-sdk", "electrobun.nim"),
+	];
+}
+
+function missingDistArtifacts(platform) {
+	return distRequirements(platform).filter((path) => !existsSync(path));
+}
+
+function ensureDevkit(logPrefix, allowBuild) {
+	const missing = missingDistArtifacts(process.platform);
+	if (missing.length === 0) return;
+
+	if (!allowBuild) {
+		throw new Error(
+			`Electrobun devkit is incomplete. Missing:\n${missing.map((path) => `  - ${path}`).join("\n")}\nRun "hutch build.ts" from package/ first, or rerun without --no-devkit-build.`,
+		);
+	}
+
+	console.log(
+		`[${logPrefix}] Local devkit is missing runtime files; building package (first run can take several minutes)...`,
+	);
+	const hutch = selectHutchBinary();
+	const buildScript = join(packageRoot, "build.ts");
+	if (hutch !== "hutch" && existsSync(hutch)) {
+		run(logPrefix, "Building Electrobun devkit", hutch, [buildScript], packageRoot);
+	} else {
+		run(logPrefix, "Building Electrobun devkit", resolveBunBinary(), [buildScript], packageRoot);
+	}
+
+	const stillMissing = missingDistArtifacts(process.platform);
+	if (stillMissing.length > 0) {
+		throw new Error(
+			`Devkit build finished but required files are still missing:\n${stillMissing.map((path) => `  - ${path}`).join("\n")}`,
+		);
+	}
+}
+
+function parseTemplateMetadata(templateRoot) {
+	const source = readFileSync(join(templateRoot, "electrobun.config.ts"), "utf8");
+	const name = source.match(/\bname:\s*"([^"]+)"/)?.[1];
+	const identifier = source.match(/\bidentifier:\s*"([^"]+)"/)?.[1];
+	const version = source.match(/\bversion:\s*"([^"]+)"/)?.[1];
+	const nimEntry =
+		source.match(/nim:\s*\{[\s\S]*?entrypoint:\s*"([^"]+)"/)?.[1] ??
+		"src/nim/main.nim";
+	const bundlesMainview =
+		source.includes("views:") && source.includes("mainview:");
+	if (!name || !identifier || !version) {
+		throw new Error(
+			`Could not read app metadata from ${join(templateRoot, "electrobun.config.ts")}`,
+		);
+	}
+	return { name, identifier, version, nimEntry, bundlesMainview };
+}
+
+function writeBundleMetadata(resourcesDir, app) {
+	writeFileSync(
+		join(resourcesDir, "version.json"),
+		`${JSON.stringify(
+			{
+				identifier: app.identifier,
+				name: app.name,
+				version: app.version,
+				channel: "dev",
+			},
+			null,
+			2,
+		)}\n`,
+	);
+	writeFileSync(
+		join(resourcesDir, "build.json"),
+		`${JSON.stringify(
+			{
+				mainProcess: "nim",
+				defaultRenderer: "native",
+				availableRenderers: ["native"],
+				buildEnvironment: "dev",
+				runtime: { exitOnLastWindowClosed: true },
+			},
+			null,
+			2,
+		)}\n`,
+	);
+}
+
+function bundleMainview(logPrefix, templateRoot, viewsDir) {
+	const entry = join(templateRoot, "src", "mainview", "index.ts");
+	if (!existsSync(entry)) {
+		throw new Error(`Missing mainview entrypoint at ${entry}`);
+	}
+	const viewSdk = join(packageRoot, "dist", "api", "browser", "index.ts");
+	if (!existsSync(viewSdk)) {
+		throw new Error(
+			`Missing browser SDK at ${viewSdk}. Build the package devkit first.`,
+		);
+	}
+	const tmpOut = join(templateRoot, "build", "mainview-bundle");
+	rmSync(tmpOut, { recursive: true, force: true });
+	mkdirSync(tmpOut, { recursive: true });
+	run(
+		logPrefix,
+		"Bundling mainview",
+		resolveBunBinary(),
+		[
+			"build",
+			entry,
+			"--outdir",
+			tmpOut,
+			"--target",
+			"browser",
+			"--format",
+			"esm",
+			"--minify",
+			`--alias:electrobun/view=${viewSdk}`,
+		],
+		templateRoot,
+		bunRunEnvironment(),
+	);
+	copyFileSync(join(tmpOut, "index.js"), join(viewsDir, "index.js"));
+}
+
+function syncMainviewAssets(logPrefix, templateRoot, viewsDir, bundlesMainview) {
+	const htmlPath = join(templateRoot, "src", "mainview", "index.html");
+	if (!existsSync(htmlPath)) {
+		throw new Error(`Missing mainview HTML at ${htmlPath}`);
+	}
+	copyFileSync(htmlPath, join(viewsDir, "index.html"));
+	const cssPath = join(templateRoot, "src", "mainview", "index.css");
+	if (existsSync(cssPath)) {
+		copyFileSync(cssPath, join(viewsDir, "index.css"));
+	}
+	if (bundlesMainview) {
+		bundleMainview(logPrefix, templateRoot, viewsDir);
+	}
+}
+
+function stageLocalBundle(logPrefix, templateRoot, app) {
+	const dist = join(packageRoot, "dist");
+	const bundleRoot = join(templateRoot, "build", "local-run");
+	rmSync(bundleRoot, { recursive: true, force: true });
+
+	const executableBase =
+		process.platform === "win32" ? `${app.name}.exe` : app.name;
+
+	if (process.platform === "darwin") {
+		const macosDir = join(bundleRoot, `${app.name}.app`, "Contents", "MacOS");
+		const resourcesDir = join(
+			bundleRoot,
+			`${app.name}.app`,
+			"Contents",
+			"Resources",
+		);
+		const viewsDir = join(resourcesDir, "app", "views", "mainview");
+		mkdirSync(macosDir, { recursive: true });
+		mkdirSync(viewsDir, { recursive: true });
+
+		copyRuntimeLibraries(dist, macosDir);
+		copyFileSync(join(dist, "preload-full.js"), join(resourcesDir, "preload-full.js"));
+		copyFileSync(
+			join(dist, "preload-sandboxed.js"),
+			join(resourcesDir, "preload-sandboxed.js"),
+		);
+		syncMainviewAssets(logPrefix, templateRoot, viewsDir, app.bundlesMainview);
+		writeBundleMetadata(resourcesDir, app);
+
+		const executable = join(macosDir, executableBase);
+		return {
+			executable,
+			nimEntry: join(templateRoot, app.nimEntry),
+		};
+	}
+
+	const exeDir = join(bundleRoot, "bin");
+	const resourcesDir = join(bundleRoot, "Resources");
+	const viewsDir = join(resourcesDir, "app", "views", "mainview");
+	mkdirSync(exeDir, { recursive: true });
+	mkdirSync(viewsDir, { recursive: true });
+
+	copyRuntimeLibraries(dist, exeDir);
+	copyFileSync(join(dist, "preload-full.js"), join(resourcesDir, "preload-full.js"));
+	copyFileSync(
+		join(dist, "preload-sandboxed.js"),
+		join(resourcesDir, "preload-sandboxed.js"),
+	);
+	syncMainviewAssets(logPrefix, templateRoot, viewsDir, app.bundlesMainview);
+	writeBundleMetadata(resourcesDir, app);
+
+	const executable = join(exeDir, executableBase);
+	return {
+		executable,
+		nimEntry: join(templateRoot, app.nimEntry),
+	};
+}
+
+function compileNimMain(logPrefix, templateRoot, executable, nimEntry) {
+	const nim = resolveNimBinary();
+	const sdkPath = resolveSdkPath();
+	run(
+		logPrefix,
+		"Compiling Nim main process",
+		nim,
+		[
+			"c",
+			"--threads:on",
+			"--mm:orc",
+			"--verbosity:0",
+			`--path:${sdkPath}`,
+			`-o:${executable}`,
+			nimEntry,
+		],
+		templateRoot,
+	);
+	if (process.platform !== "win32") {
+		chmodSync(executable, 0o755);
+	}
+}
+
+function runLocal(logPrefix, templateRoot, app, options) {
+	ensureDevkit(logPrefix, options.devkitBuild);
+	const { executable, nimEntry } = stageLocalBundle(logPrefix, templateRoot, app);
+	compileNimMain(logPrefix, templateRoot, executable, nimEntry);
+	if (options.buildOnly) {
+		console.log(`[${logPrefix}] Built ${executable}`);
+		return;
+	}
+	console.log(`[${logPrefix}] Launching ${executable}`);
+	run(logPrefix, "Running app", executable, [], dirname(executable));
+}
+
+function runWithHutch(logPrefix, templateRoot, options) {
+	throw new Error(
+		`${logPrefix}: Hutch electrobun dev does not support mainProcess "nim" yet. Rerun without --hutch (local dev bundle).`,
+	);
+}
+
+function main() {
+	if (process.platform === "win32" && process.arch === "arm64") {
+		console.log("Nim template dev skipped: Windows ARM64 is unsupported.");
+		process.exit(0);
+	}
+
+	const { templateName, options } = parseArgs(process.argv.slice(2));
+	if (options.help) {
+		usage();
+		return;
+	}
+
+	const templateRoot = join(repositoryRoot, "templates", templateName);
+	const logPrefix = templateName;
+	if (!existsSync(templateRoot)) {
+		throw new Error(`Template directory not found: ${templateRoot}`);
+	}
+
+	const app = parseTemplateMetadata(templateRoot);
+
+	if (options.hutch) {
+		runWithHutch(logPrefix, templateRoot, options);
+	} else {
+		runLocal(logPrefix, templateRoot, app, options);
+	}
+}
+
+try {
+	main();
+} catch (error) {
+	console.error(error instanceof Error ? error.message : String(error));
+	process.exit(1);
+}

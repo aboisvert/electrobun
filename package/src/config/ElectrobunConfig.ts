@@ -148,9 +148,10 @@ export interface ElectrobunConfig {
 		 * - "rust": build and run a Cargo binary target
 		 * - "go": compile and run the Go main process entrypoint
 		 * - "odin": compile and run the Odin main process entrypoint
+		 * - "nim": compile and run the Nim main process entrypoint
 		 * @default "bun"
 		 */
-		mainProcess?: "bun" | "cottontail" | "zig" | "rust" | "go" | "odin";
+		mainProcess?: "bun" | "cottontail" | "zig" | "rust" | "go" | "odin" | "nim";
 
 		/**
 		 * Bun main process build configuration.
@@ -295,6 +296,27 @@ export interface ElectrobunConfig {
 			 * package directory; a file entrypoint compiles its containing
 			 * directory as the root package.
 			 * @default "src/odin/main.odin"
+			 */
+			entrypoint?: string;
+		};
+
+		/**
+		 * Nim main process build configuration.
+		 * Used when `build.mainProcess` is set to `"nim"`.
+		 *
+		 * Note: Nim support has platform caveats on Windows (x64 only, MSVC Build
+		 * Tools required). See docs for details.
+		 */
+		nim?: {
+			/**
+			 * Exact Nim toolchain override. When omitted, Hutch uses the default
+			 * declared by the selected Electrobun devkit.
+			 */
+			version?: string;
+
+			/**
+			 * Entry point for the main Nim process.
+			 * @default "src/nim/main.nim"
 			 */
 			entrypoint?: string;
 		};

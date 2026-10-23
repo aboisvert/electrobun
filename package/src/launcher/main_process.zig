@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const MainProcess = enum { bun, cottontail, zig, rust, go, odin };
+pub const MainProcess = enum { bun, cottontail, zig, rust, go, odin, nim };
 
 pub fn fromMetadata(allocator: std.mem.Allocator, content: []const u8) MainProcess {
     const parsed = std.json.parseFromSlice(std.json.Value, allocator, content, .{}) catch return .bun;

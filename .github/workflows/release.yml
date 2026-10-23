@@ -297,6 +297,10 @@ jobs:
         run: node scripts/test-zig-webview-observations.mjs
         working-directory: kitchen
 
+      - name: Test Nim Kitchen callback isolation
+        run: node scripts/test-nim-webview-observations.mjs
+        working-directory: kitchen
+
       - name: Test Windows release validation contract
         if: matrix.platform == 'win32'
         run: node --test scripts/windows-release-validation.test.mjs scripts/webview2-runtime.test.mjs scripts/windows-msvc-environment.test.mjs scripts/updater-lifecycle-target.test.mjs

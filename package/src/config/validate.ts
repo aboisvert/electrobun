@@ -54,7 +54,7 @@ export function assertValidVersionPins(config: unknown): void {
 	const build = record(configRecord["build"]);
 	if (!build) return;
 
-	for (const language of ["zig", "rust", "go"] as const) {
+	for (const language of ["zig", "rust", "go", "nim"] as const) {
 		const languageConfig = record(build[language]);
 		if (!languageConfig || !Object.hasOwn(languageConfig, "version")) continue;
 		assertExactVersion(

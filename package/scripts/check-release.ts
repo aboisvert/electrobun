@@ -18,6 +18,7 @@ export const releaseCheckTasks = [
 	["Version bump tests", "test:version-bump"],
 	["Template tests", "test:templates"],
 	["Odin template tests", "test:odin-templates"],
+	["Nim template tests", "test:nim-templates"],
 	["Template publisher tests", "test:template-publisher"],
 	["Signing tests", "test:signing"],
 	["Deployment target tests", "test:deployment-target"],

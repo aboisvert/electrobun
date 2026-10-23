@@ -1,5 +1,6 @@
 import { GO_VERSION } from "./go-version";
 import { ODIN_VERSION } from "./odin-version";
+import { NIM_VERSION } from "./nim-version";
 import { RUST_VERSION } from "./rust-version";
 import { ZIG_VERSION } from "./build-dependencies";
 import { BUN_VERSION } from "./bun-version";
@@ -101,6 +102,7 @@ export interface NativeDevkitManifest {
 		rust: { defaultVersion: string };
 		go: { defaultVersion: string };
 		odin: { defaultVersion: string };
+		nim: { defaultVersion: string };
 		bun: { defaultVersion: string };
 		cottontail: { defaultVersion: string };
 	};
@@ -145,6 +147,11 @@ export interface NativeDevkitManifest {
 				entrypoint: string;
 				collection: string;
 				collectionName: string;
+			};
+			nim: {
+				supported?: boolean;
+				root: string;
+				entrypoint: string;
 			};
 		};
 	};
@@ -228,6 +235,7 @@ export function createNativeDevkitManifest(options: {
 		ODIN_VERSION,
 		"Odin default version",
 	);
+	const nimVersion = assertStrictSemVer(NIM_VERSION, "Nim default version");
 
 	return {
 		schemaVersion: NATIVE_DEVKIT_SCHEMA_VERSION,
@@ -245,6 +253,7 @@ export function createNativeDevkitManifest(options: {
 			rust: { defaultVersion: rustVersion },
 			go: { defaultVersion: goVersion },
 			odin: { defaultVersion: odinVersion },
+			nim: { defaultVersion: nimVersion },
 			bun: { defaultVersion: bunVersion },
 			cottontail: { defaultVersion: cottontailVersion },
 		},
@@ -278,6 +287,11 @@ export function createNativeDevkitManifest(options: {
 					entrypoint: "odin-sdk/electrobun/electrobun.odin",
 					collection: "odin-sdk",
 					collectionName: "electrobun_sdk",
+				},
+				nim: {
+					...(options.target.os === "win" && options.target.arch === "arm64" ? { supported: false } : {}),
+					root: "nim-sdk",
+					entrypoint: "nim-sdk/electrobun.nim",
 				},
 			},
 		},

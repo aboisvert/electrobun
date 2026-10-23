@@ -11,6 +11,7 @@ describe("native Kitchen AUTO_RUN contract", () => {
 		["Rust", "src/rust/main.rs", "finish_auto_run"],
 		["Go", "src/go/main.go", "finishAutoRun"],
 		["Odin", "src/odin/main.odin", "finishAutoRun"],
+		["Nim", "src/nim/main.nim", "finishAutoRun"],
 	] as const) {
 		it(`${backend} exits AUTO_RUN with the aggregate result`, () => {
 			const source = read(path);
