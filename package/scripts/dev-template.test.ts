@@ -16,6 +16,7 @@ import {
 	parseTemplateName,
 	readPackageHutchPins,
 	readPackageVersion,
+	readTemplateMainProcess,
 	resolvedHutchEnginePath,
 	resolveTemplateDirectory,
 	validateBuiltDevkitVersion,
@@ -170,6 +171,103 @@ try {
 	assert.throws(
 		() => availableTemplateNames(join(scratch, "missing-templates")),
 		/Could not read templates directory/,
+	);
+
+	const configsDir = join(scratch, "configs");
+	mkdirSync(configsDir, { recursive: true });
+	function writeTestConfig(name: string, source: string): string {
+		const directory = join(configsDir, name);
+		mkdirSync(directory, { recursive: true });
+		writeFileSync(join(directory, "electrobun.config.ts"), source);
+		return directory;
+	}
+	assert.equal(
+		await readTemplateMainProcess(
+			writeTestConfig(
+				"nim",
+				[
+					'import type { ElectrobunConfig } from "electrobun";',
+					"",
+					"// build: { mainProcess: \"odin\" }",
+					"export default {",
+					"\tbuild: { mainProcess: \"nim\" },",
+					"} satisfies ElectrobunConfig;",
+					"",
+				].join("\n"),
+			),
+		),
+		"nim",
+	);
+	assert.equal(
+		await readTemplateMainProcess(
+			writeTestConfig(
+				"non-nim",
+				[
+					'import type { ElectrobunConfig } from "electrobun";',
+					"",
+					"export default {",
+					"\tbuild: { mainProcess: \"odin\" },",
+					"} satisfies ElectrobunConfig;",
+					"",
+				].join("\n"),
+			),
+		),
+		"odin",
+	);
+	assert.equal(
+		await readTemplateMainProcess(
+			writeTestConfig(
+				"non-word-value",
+				"export default { build: { mainProcess: \"bun\" } };",
+			),
+		),
+		"bun",
+	);
+	assert.equal(
+		await readTemplateMainProcess(
+			writeTestConfig(
+				"decoy-key",
+				'export default { build: { otherMainProcess: "nim" } };',
+			),
+		),
+		undefined,
+	);
+	assert.equal(
+		await readTemplateMainProcess(join(configsDir, "missing-config")),
+		undefined,
+	);
+	// Configs with relative specifiers Node cannot resolve still expose the
+	// build.mainProcess value through the comment-stripping text fallback.
+	assert.equal(
+		await readTemplateMainProcess(
+			writeTestConfig(
+				"unresolvable-import",
+				[
+					'import { variant } from "./unresolvable";',
+					"",
+					"export default {",
+					"\tbuild: {",
+					"\t\t// mainProcess: variant,",
+					'\t\tmainProcess: "zig",',
+					"\t},",
+					"};",
+					"",
+				].join("\n"),
+			),
+		),
+		"zig",
+	);
+	assert.equal(
+		await readTemplateMainProcess(
+			resolve(
+				import.meta.dirname,
+				"..",
+				"..",
+				"templates",
+				"nim-hello-world",
+			),
+		),
+		"nim",
 	);
 
 	writeJson(join(packageDir, "package.json"), {

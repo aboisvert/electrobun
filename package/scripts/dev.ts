@@ -98,6 +98,10 @@ function formatCommand(command: DevCommand) {
 	return [command.command, ...command.args].map((value) => JSON.stringify(value)).join(" ");
 }
 
+// Builds the environment for spawned dev commands. When HUTCH_BINARY points at
+// the pinned `hutch` launcher, its directory is prepended to PATH so nested
+// `hutch` calls inside template dev tasks (which re-invoke `hutch` from PATH)
+// resolve to the same pinned launcher instead of an arbitrary one.
 export function resolveDevCommandEnvironment(
 	env: NodeJS.ProcessEnv | undefined,
 ): NodeJS.ProcessEnv {

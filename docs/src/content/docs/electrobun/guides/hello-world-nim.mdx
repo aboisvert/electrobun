@@ -59,9 +59,8 @@ Create `src/mainview/index.html`:
 
 ## 3. Add the main process
 
-Create `src/nim/main.nim`. Import the SDK with `import electrobun`. Hutch
-projects the versioned module into `.hutch/devkit/nim-sdk` and passes that
-directory on `--path` when it invokes the Nim compiler:
+Create `src/nim/main.nim`. Import the SDK with `import electrobun`; builds
+resolve it from the Nim SDK directory passed on `--path`:
 
 ```nim
 import std/os
@@ -168,21 +167,15 @@ export default {
 } satisfies ElectrobunConfig;
 ```
 
-The project owns its Nim sources. Hutch compiles the configured entrypoint with
-`nim c --path:.hutch/devkit/nim-sdk`; it does not generate a nimble file.
+The project owns its Nim sources. The build compiles the configured entrypoint
+with `nim c` and the Nim SDK on `--path`; it does not generate a nimble file.
 
 ## 5. Run the app
 
-```bash
-hutch electrobun sync
-hutch run dev
-```
-
-Hutch builds and launches the app, then rebuilds it when watched source files
-change. Press Ctrl+C to stop it.
-
-In the Electrobun repository, you can run the checked-in sample without
-creating a project first:
+Hutch does not yet accept `mainProcess: "nim"` in `hutch electrobun
+build`/`run`/`dev`. For now, run Nim apps with the repository scripts, which
+compile with the vendored pinned toolchain. Inside the Electrobun repository,
+you can run the checked-in sample without creating a project first:
 
 ```bash
 cd package
@@ -191,8 +184,9 @@ hutch run:nim-hello-world
 
 That script builds the local devkit when needed, compiles
 `templates/nim-hello-world`, stages a dev bundle, and launches the window.
-Use `--hutch` to drive the flow through `hutch electrobun sync/build/run`
-instead, or `--build-only` to compile without opening the app.
+Use `--build-only` to compile without opening the app. The project above
+mirrors `templates/nim-hello-world`, so once Hutch accepts Nim,
+`hutch electrobun sync` followed by `hutch run dev` becomes the normal flow.
 
 <Aside type="note">
 The app only works from a hutch-built bundle layout — the SDK loads
@@ -245,9 +239,9 @@ hutch electrobun init nim-app --template=nim-particles-wgpu
 ## Toolchain
 
 Electrobun 2 pins **Nim 2.2.12** and guarantees the SDK against that release.
-Override it exactly with `build.nim.version`. Hutch uses a system compiler only
-on an exact version match; otherwise it downloads the selected toolchain into
-`~/.hutch/toolchains/nim/<version>/<platform>` and reuses it across projects.
+Override it exactly with `build.nim.version`. The SDK requires the vendored
+toolchain from the repository build (`package/vendors/nim`); a system `nim` is
+used only when it reports the exact pinned version (never an arbitrary one).
 The compiler is not bundled into the finished app.
 
 Platform requirements: macOS needs the Xcode Command Line Tools, Linux needs

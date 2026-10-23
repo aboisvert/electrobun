@@ -7,12 +7,16 @@ import {
 	mkdtempSync,
 	mkdirSync,
 	readdirSync,
-	readFileSync,
 	rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	readElectrobunConfig,
+	templateNimEntrypoint,
+} from "./template-config.mjs";
+import { resolveNimBinary } from "./nim-toolchain.mjs";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repositoryRoot = resolve(packageRoot, "..");
@@ -23,21 +27,7 @@ if (process.platform === "win32" && process.arch === "arm64") {
 	process.exit(0);
 }
 
-function resolveNimBinary() {
-	const vendored = join(
-		packageRoot,
-		"vendors",
-		"nim",
-		"bin",
-		process.platform === "win32" ? "nim.exe" : "nim",
-	);
-	if (existsSync(vendored)) {
-		return vendored;
-	}
-	return process.platform === "win32" ? "nim.exe" : "nim";
-}
-
-const nimBinary = resolveNimBinary();
+const nimBinary = resolveNimBinary().binary;
 
 function templateNimPackages() {
 	return readdirSync(templatesRoot, { withFileTypes: true })
@@ -50,14 +40,9 @@ function templateNimPackages() {
 		.sort((left, right) => left.name.localeCompare(right.name));
 }
 
-function readMainEntrypoint(templateName) {
-	const configPath = join(templatesRoot, templateName, "electrobun.config.ts");
-	if (!existsSync(configPath)) {
-		return "main.nim";
-	}
-	const source = readFileSync(configPath, "utf8");
-	const match = source.match(/entrypoint:\s*"src\/nim\/([^"]+)"/);
-	return match?.[1] ?? "main.nim";
+async function readMainEntrypoint(templateName) {
+	const config = await readElectrobunConfig(join(templatesRoot, templateName));
+	return templateNimEntrypoint(config);
 }
 
 function resolveSdkCollection() {
@@ -135,7 +120,7 @@ try {
 			]);
 		}
 
-		const mainEntry = readMainEntrypoint(template.name);
+		const mainEntry = await readMainEntrypoint(template.name);
 		const mainPath = join(template.nimDir, mainEntry);
 		if (!existsSync(mainPath)) {
 			throw new Error(`${template.name} missing main entrypoint at ${mainPath}`);

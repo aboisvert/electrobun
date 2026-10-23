@@ -1,6 +1,5 @@
 ## Electrobun Kitchen Sink - Nim main process.
-## Electrobun Kitchen Sink - Nim main process.
-import std/[json, os, ospaths, strutils, strformat, times, monotimes, locks, atomics, parseutils, math, tables, syncio, options, typedthreads]
+import std/[json, os, strutils, strformat, times, monotimes, locks, atomics, parseutils, math, tables, syncio, options, typedthreads]
 import electrobun
 
 const appVersion = "1.18.1"
@@ -931,6 +930,9 @@ proc buildConfigPayload(): BuildConfigPayload =
     availableRenderers: renderers,
     mainProcess: "nim",
     cefVersion: state.cefVersion,
+    # NimVersion is the Nim stdlib's system.NimVersion constant: the version
+    # of the vendored toolchain that compiled this harness, not a pin
+    # Electrobun manages itself.
     nimVersion: some(NimVersion),
   )
 

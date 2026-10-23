@@ -5,6 +5,11 @@ export const KITCHEN_MAIN_PROCESSES = [
 	"rust",
 	"go",
 	"odin",
+	// This variant requires a repo-local bundle path (the route
+	// package/scripts/run-nim-template-dev.mjs takes for templates/, which
+	// does not extend to kitchen): the pinned Hutch 0.28.1 rejects
+	// `build.mainProcess: "nim"` at config validation, so matrix
+	// `hutch electrobun build/run` runs of this variant never get past that.
 	"nim",
 ] as const;
 

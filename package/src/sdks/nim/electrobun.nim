@@ -585,9 +585,15 @@ type
     title*, image*: string
     isTemplate*: bool
     width*, height*: uint32
+    ## Called by the core when an item in this tray's menu is clicked,
+    ## receiving the item id and the item's action string.
+    ## Nil by default: without a handler tray actions are inert.
+    ## Use a top-level `proc (itemId: uint32; action: cstring)
+    ## {.cdecl, raises: [].}` so the pointer stays valid for the C ABI.
+    handler*: StatusItemHandler
 
 proc defaultTrayOptions*(image: string): TrayOptions =
-  TrayOptions(image: image, width: 18, height: 18)
+  TrayOptions(image: image, width: 18, height: 18, handler: nil)
 
 type
   Display* = object
@@ -1474,6 +1480,9 @@ proc evaluateJavaScriptWithNoCompletion*(self: Core; webviewId: uint32; js: stri
   withZ(js, z): self.symbols.evaluateJavaScriptWithNoCompletion(webviewId, z)
   self.ensureLastCallSucceeded()
 
+## Mirrors the zig/odin/go SDKs: when the core transport declines the message
+## it silently falls back to evaluating the raw JSON as a JS call (no escaping)
+## and the eval's EbError is the result.
 proc sendHostMessageToWebviewJson*(self: Core; webviewId: uint32; message: JsonNode): EbError =
   let messageJson = $message
   withZ(messageJson, z):
@@ -1507,7 +1516,8 @@ proc createTray*(self: Core; options: TrayOptions): (uint32, EbError) =
   withZ(options.title, titleZ):
     withZ(options.image, imageZ):
       let trayId = self.symbols.createTray(
-        titleZ, imageZ, options.isTemplate, options.width, options.height, nil)
+        titleZ, imageZ, options.isTemplate, options.width, options.height,
+        options.handler)
       if trayId == 0:
         return (0'u32, errorFromLastError(self.lastErrorString()))
       (trayId, ebNone)

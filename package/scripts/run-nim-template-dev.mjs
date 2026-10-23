@@ -7,13 +7,14 @@ import {
 	cpSync,
 	existsSync,
 	mkdirSync,
-	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { selectHutchBinary } from "./hutch-launcher.mjs";
+import { readElectrobunConfig } from "./template-config.mjs";
+import { resolveNimBinary } from "./nim-toolchain.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "..");
@@ -97,43 +98,7 @@ function copyRuntimeLibraries(dist, destDir) {
 	}
 }
 
-function resolveNimBinary() {
-	const vendored = join(
-		packageRoot,
-		"vendors",
-		"nim",
-		"bin",
-		process.platform === "win32" ? "nim.exe" : "nim",
-	);
-	if (existsSync(vendored)) return vendored;
-	return process.platform === "win32" ? "nim.exe" : "nim";
-}
 
-function bunRunEnvironment() {
-	const env = { ...process.env };
-	if (!env.ASDF_BUN_VERSION) {
-		env.ASDF_BUN_VERSION = "1.4.2";
-	}
-	return env;
-}
-
-function resolveBunBinary() {
-	const local = join(
-		packageRoot,
-		"node_modules",
-		".bin",
-		process.platform === "win32" ? "bun.exe" : "bun",
-	);
-	if (existsSync(local)) return local;
-	const asdfShim = join(
-		process.env.HOME ?? "",
-		".asdf",
-		"shims",
-		process.platform === "win32" ? "bun.exe" : "bun",
-	);
-	if (asdfShim && existsSync(asdfShim)) return asdfShim;
-	return process.platform === "win32" ? "bun.exe" : "bun";
-}
 
 function resolveSdkPath() {
 	const built = join(packageRoot, "dist", "nim-sdk", "electrobun.nim");
@@ -155,6 +120,27 @@ function missingDistArtifacts(platform) {
 	return distRequirements(platform).filter((path) => !existsSync(path));
 }
 
+// Bun-like runtime resolution for running/bundling TS. The pinned hutch
+// launcher (its engine is Bun-compatible and `hutch build` passes `bun build`
+// flags straight through, verified for the flags used by bundleMainview) is
+// preferred so template tasks use the same runtime that builds the devkit.
+// Otherwise fall back to a package-local bun shim, then plain `bun` from PATH.
+// (An earlier `~/.asdf/shims` arm here — plus an ASDF_BUN_VERSION env override
+// in the bundle environment — hard-coded one machine's asdf setup and was
+// removed rather than made generic.)
+function resolveBunLikeBinary() {
+	const hutch = selectHutchBinary();
+	if (hutch !== "hutch" && existsSync(hutch)) return hutch;
+	const local = join(
+		packageRoot,
+		"node_modules",
+		".bin",
+		process.platform === "win32" ? "bun.exe" : "bun",
+	);
+	if (existsSync(local)) return local;
+	return process.platform === "win32" ? "bun.exe" : "bun";
+}
+
 function ensureDevkit(logPrefix, allowBuild) {
 	const missing = missingDistArtifacts(process.platform);
 	if (missing.length === 0) return;
@@ -168,13 +154,8 @@ function ensureDevkit(logPrefix, allowBuild) {
 	console.log(
 		`[${logPrefix}] Local devkit is missing runtime files; building package (first run can take several minutes)...`,
 	);
-	const hutch = selectHutchBinary();
 	const buildScript = join(packageRoot, "build.ts");
-	if (hutch !== "hutch" && existsSync(hutch)) {
-		run(logPrefix, "Building Electrobun devkit", hutch, [buildScript], packageRoot);
-	} else {
-		run(logPrefix, "Building Electrobun devkit", resolveBunBinary(), [buildScript], packageRoot);
-	}
+	run(logPrefix, "Building Electrobun devkit", resolveBunLikeBinary(), [buildScript], packageRoot);
 
 	const stillMissing = missingDistArtifacts(process.platform);
 	if (stillMissing.length > 0) {
@@ -184,20 +165,21 @@ function ensureDevkit(logPrefix, allowBuild) {
 	}
 }
 
-function parseTemplateMetadata(templateRoot) {
-	const source = readFileSync(join(templateRoot, "electrobun.config.ts"), "utf8");
-	const name = source.match(/\bname:\s*"([^"]+)"/)?.[1];
-	const identifier = source.match(/\bidentifier:\s*"([^"]+)"/)?.[1];
-	const version = source.match(/\bversion:\s*"([^"]+)"/)?.[1];
+async function parseTemplateMetadata(templateRoot) {
+	const config = await readElectrobunConfig(templateRoot);
+	const configPath = join(templateRoot, "electrobun.config.ts");
+	const app = config?.app ?? {};
+	const name = typeof app.name === "string" ? app.name : undefined;
+	const identifier =
+		typeof app.identifier === "string" ? app.identifier : undefined;
+	const version = typeof app.version === "string" ? app.version : undefined;
 	const nimEntry =
-		source.match(/nim:\s*\{[\s\S]*?entrypoint:\s*"([^"]+)"/)?.[1] ??
-		"src/nim/main.nim";
-	const bundlesMainview =
-		source.includes("views:") && source.includes("mainview:");
+		typeof config?.build?.nim?.entrypoint === "string"
+			? config.build.nim.entrypoint
+			: "src/nim/main.nim";
+	const bundlesMainview = config?.build?.views?.mainview !== undefined;
 	if (!name || !identifier || !version) {
-		throw new Error(
-			`Could not read app metadata from ${join(templateRoot, "electrobun.config.ts")}`,
-		);
+		throw new Error(`Could not read app metadata from ${configPath}`);
 	}
 	return { name, identifier, version, nimEntry, bundlesMainview };
 }
@@ -249,7 +231,7 @@ function bundleMainview(logPrefix, templateRoot, viewsDir) {
 	run(
 		logPrefix,
 		"Bundling mainview",
-		resolveBunBinary(),
+		resolveBunLikeBinary(),
 		[
 			"build",
 			entry,
@@ -263,7 +245,6 @@ function bundleMainview(logPrefix, templateRoot, viewsDir) {
 			`--alias:electrobun/view=${viewSdk}`,
 		],
 		templateRoot,
-		bunRunEnvironment(),
 	);
 	copyFileSync(join(tmpOut, "index.js"), join(viewsDir, "index.js"));
 }
@@ -342,7 +323,7 @@ function stageLocalBundle(logPrefix, templateRoot, app) {
 }
 
 function compileNimMain(logPrefix, templateRoot, executable, nimEntry) {
-	const nim = resolveNimBinary();
+	const nim = resolveNimBinary().binary;
 	const sdkPath = resolveSdkPath();
 	run(
 		logPrefix,
@@ -382,7 +363,7 @@ function runWithHutch(logPrefix, templateRoot, options) {
 	);
 }
 
-function main() {
+async function main() {
 	if (process.platform === "win32" && process.arch === "arm64") {
 		console.log("Nim template dev skipped: Windows ARM64 is unsupported.");
 		process.exit(0);
@@ -400,7 +381,7 @@ function main() {
 		throw new Error(`Template directory not found: ${templateRoot}`);
 	}
 
-	const app = parseTemplateMetadata(templateRoot);
+	const app = await parseTemplateMetadata(templateRoot);
 
 	if (options.hutch) {
 		runWithHutch(logPrefix, templateRoot, options);
@@ -410,7 +391,7 @@ function main() {
 }
 
 try {
-	main();
+	await main();
 } catch (error) {
 	console.error(error instanceof Error ? error.message : String(error));
 	process.exit(1);

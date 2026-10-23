@@ -120,9 +120,10 @@ The Zig project owns `build.zig`; Hutch invokes it with the projected SDK path.
 Rust owns `Cargo.toml` and `Cargo.lock`, with the Electrobun SDK referenced at
 `.hutch/devkit/rust-sdk`. Go owns `go.mod` and `go.sum`, with a local `replace`
 to `.hutch/devkit/go-sdk`. Odin compiles the configured source package with the
-projected `electrobun_sdk` collection. Nim compiles the configured entrypoint
-with `nim c --path:.hutch/devkit/nim-sdk`. Hutch does not generate any of those
-build descriptions or synthesize a GOPATH.
+projected `electrobun_sdk` collection. The devkit declares a Nim SDK for
+`nim c --path`; Hutch does not yet accept `mainProcess: "nim"`, so repository
+scripts compile Nim entrypoints with the vendored pinned toolchain for now.
+Hutch does not generate any of those build descriptions or synthesize a GOPATH.
 
 The fastest way to see real native SDK code is to generate a template — each
 one contains complete SDK initialization, window, webview, RPC, and
@@ -170,9 +171,9 @@ project to the current channel head.
 - Native main processes currently build for the host operating system and
   architecture. Use native CI runners for a release matrix.
 - Windows supports x64 and ARM64 for Zig, Rust and Go main
-  processes. Odin remains Windows x64-only.
-- Windows Rust and Odin builds require Visual Studio Build Tools and the Windows
-  SDK.
+  processes. Odin and Nim remain Windows x64-only.
+- Windows Rust, Odin, and Nim builds require Visual Studio Build Tools and the
+  Windows SDK.
 - macOS needs Xcode Command Line Tools. Linux needs the platform compiler and
   linker packages documented in [Cross-Platform Development](/electrobun/guides/cross-platform-development/).
 - Odin is pre-1.0. Electrobun guarantees the SDK against its pinned Odin release,

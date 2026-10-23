@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { assertStrictSemVer } from "../src/shared/strict-semver.js";
 import { validateNativeDevkitManifest } from "./validate-native-devkit.mjs";
+import { readElectrobunConfig } from "./template-config.mjs";
 import {
 	resolveDevCommandEnvironment,
 	resolveHutchBinary,
@@ -335,6 +336,14 @@ export function resolvedHutchEnginePath(output: string): string {
 	return path;
 }
 
+// Resolves the pinned `hutch` launcher from the engine binary path (obtained
+// via `hutch self path`). The launcher is expected to live next to the engine,
+// so this throws when it is missing. Plan steps intentionally invoke the pinned
+// launcher rather than a bare `hutch`: template dev tasks (e.g. in
+// hutch.config.ts) re-invoke `hutch` from PATH, and because dev commands get
+// HUTCH_BINARY with its directory prepended to PATH (see
+// resolveDevCommandEnvironment in dev.ts), those nested `hutch` invocations
+// resolve to this same pinned launcher.
 export function pinnedHutchLauncherFromEngine(hutchEngineBinary: string): string {
 	const launcher = join(
 		dirname(hutchEngineBinary),
@@ -348,13 +357,14 @@ export function pinnedHutchLauncherFromEngine(hutchEngineBinary: string): string
 	return launcher;
 }
 
-export function readTemplateMainProcess(templateDir: string): string | undefined {
-	const configPath = join(templateDir, "electrobun.config.ts");
-	if (!existsSync(configPath)) {
-		return undefined;
-	}
-	const source = readFileSync(configPath, "utf8");
-	return /mainProcess:\s*["'](\w+)["']/.exec(source)?.[1];
+export async function readTemplateMainProcess(
+	templateDir: string,
+): Promise<string | undefined> {
+	const config = (await readElectrobunConfig(templateDir)) as
+		| { build?: { mainProcess?: unknown } }
+		| undefined;
+	const mainProcess = config?.build?.mainProcess;
+	return typeof mainProcess === "string" ? mainProcess : undefined;
 }
 
 export function createTemplateDevPlan(options: {
@@ -492,7 +502,7 @@ async function main(): Promise<void> {
 		hutchPins,
 	});
 
-	if (readTemplateMainProcess(templateDir) === "nim") {
+	if ((await readTemplateMainProcess(templateDir)) === "nim") {
 		plan.dev = {
 			label: "Launch template development app",
 			command: process.execPath,

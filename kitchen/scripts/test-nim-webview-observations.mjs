@@ -3,19 +3,14 @@ import { existsSync, mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveNimBinary } from "../../package/scripts/nim-toolchain.mjs";
 
 const kitchen = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const vendorNim = join(
-	kitchen,
-	"..",
-	"package",
-	"vendors",
-	"nim",
-	"bin",
-	process.platform === "win32" ? "nim.exe" : "nim",
-);
-const nim = process.env.ELECTROBUN_NIM || (existsSync(vendorNim) ? vendorNim : "nim");
-if (nim !== "nim" && !existsSync(nim)) {
+// Explicitly provided paths are trusted as-is (no version check); the shared
+// helper otherwise prefers the vendored toolchain and only falls back to a
+// system nim matching the pinned version (see package/scripts/nim-toolchain.mjs).
+const nim = process.env.ELECTROBUN_NIM || resolveNimBinary().binary;
+if (process.env.ELECTROBUN_NIM && !existsSync(nim)) {
 	throw new Error(`Nim compiler is missing: ${nim}. Run the Electrobun package build first.`);
 }
 const version = spawnSync(nim, ["--version"], { encoding: "utf8", windowsHide: true });
