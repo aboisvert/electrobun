@@ -2,8 +2,8 @@
 
 An Electrobun template with a Nim main process and an `<electrobun-wgpu>` overlay surface. The webview owns layout and controls; Nim runs a data-oriented particle simulation (~10k–50k particles) on the CPU and renders it as additive-blended instanced quads through a native WGPU pipeline. Three emitter modes: fountain, fireworks, and vortex.
 
-After `hutch electrobun sync` in this directory (requires Hutch ≥ 0.28.2 and
-a devkit release that ships the Nim toolchain and SDK entries):
+After `hutch electrobun sync` in this directory using a Nim-enabled Hutch
+build and a devkit with Nim entries (see the release limitation below):
 
 ```sh
 hutch run dev
