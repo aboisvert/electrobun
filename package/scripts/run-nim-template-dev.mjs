@@ -11,11 +11,12 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { selectHutchBinary } from "./hutch-launcher.mjs";
 import { readElectrobunConfig } from "./template-config.mjs";
 import { resolveNimBinary } from "./nim-toolchain.mjs";
+import { nimRuntimeLibraryPaths } from "./nim-runtime-libraries.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "..");
@@ -70,35 +71,9 @@ function run(logPrefix, label, command, args, cwd, env = process.env) {
 	}
 }
 
-function coreLibFileName(platform) {
-	if (platform === "win32") return "ElectrobunCore.dll";
-	if (platform === "darwin") return "libElectrobunCore.dylib";
-	return "libElectrobunCore.so";
-}
-
-function nativeWrapperFileName(platform) {
-	if (platform === "win32") return "libNativeWrapper.dll";
-	if (platform === "darwin") return "libNativeWrapper.dylib";
-	return "libNativeWrapper.so";
-}
-
-function asarLibFileName(platform) {
-	if (platform === "win32") return "libasar.dll";
-	if (platform === "darwin") return "libasar.dylib";
-	return "libasar.so";
-}
-
-function runtimeLibraryFileNames(platform) {
-	return [
-		coreLibFileName(platform),
-		nativeWrapperFileName(platform),
-		asarLibFileName(platform),
-	];
-}
-
-function copyRuntimeLibraries(dist, destDir) {
-	for (const name of runtimeLibraryFileNames(process.platform)) {
-		cpSync(join(dist, name), join(destDir, name));
+function copyRuntimeLibraries(dist, destDir, app) {
+	for (const path of nimRuntimeLibraryPaths(dist, app)) {
+		cpSync(join(dist, path), join(destDir, basename(path)));
 	}
 }
 
@@ -110,18 +85,20 @@ function resolveSdkPath() {
 	return join(packageRoot, "src", "sdks", "nim");
 }
 
-function distRequirements(platform) {
+function distRequirements(app) {
 	const dist = join(packageRoot, "dist");
+	const manifest = join(dist, "native-devkit.json");
+	if (!existsSync(manifest)) return [manifest];
 	return [
-		...runtimeLibraryFileNames(platform).map((name) => join(dist, name)),
+		...nimRuntimeLibraryPaths(dist, app).map((name) => join(dist, name)),
 		join(dist, "preload-full.js"),
 		join(dist, "preload-sandboxed.js"),
 		join(dist, "nim-sdk", "electrobun.nim"),
 	];
 }
 
-function missingDistArtifacts(platform) {
-	return distRequirements(platform).filter((path) => !existsSync(path));
+function missingDistArtifacts(app) {
+	return distRequirements(app).filter((path) => !existsSync(path));
 }
 
 // Bun-like runtime resolution for running/bundling TS. The pinned hutch
@@ -145,8 +122,8 @@ function resolveBunLikeBinary() {
 	return process.platform === "win32" ? "bun.exe" : "bun";
 }
 
-function ensureDevkit(logPrefix, allowBuild) {
-	const missing = missingDistArtifacts(process.platform);
+function ensureDevkit(logPrefix, allowBuild, app) {
+	const missing = missingDistArtifacts(app);
 	if (missing.length === 0) return;
 
 	if (!allowBuild) {
@@ -161,7 +138,7 @@ function ensureDevkit(logPrefix, allowBuild) {
 	const buildScript = join(packageRoot, "build.ts");
 	run(logPrefix, "Building Electrobun devkit", resolveBunLikeBinary(), [buildScript], packageRoot);
 
-	const stillMissing = missingDistArtifacts(process.platform);
+	const stillMissing = missingDistArtifacts(app);
 	if (stillMissing.length > 0) {
 		throw new Error(
 			`Devkit build finished but required files are still missing:\n${stillMissing.map((path) => `  - ${path}`).join("\n")}`,
@@ -182,10 +159,12 @@ async function parseTemplateMetadata(templateRoot) {
 			? config.build.nim.entrypoint
 			: "src/nim/main.nim";
 	const bundlesMainview = config?.build?.views?.mainview !== undefined;
+	const target = process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "linux";
+	const bundleWGPU = config?.build?.[target]?.bundleWGPU === true;
 	if (!name || !identifier || !version) {
 		throw new Error(`Could not read app metadata from ${configPath}`);
 	}
-	return { name, identifier, version, nimEntry, bundlesMainview };
+	return { name, identifier, version, nimEntry, bundlesMainview, bundleWGPU };
 }
 
 function writeBundleMetadata(resourcesDir, app) {
@@ -288,7 +267,7 @@ function stageLocalBundle(logPrefix, templateRoot, app) {
 		mkdirSync(macosDir, { recursive: true });
 		mkdirSync(viewsDir, { recursive: true });
 
-		copyRuntimeLibraries(dist, macosDir);
+		copyRuntimeLibraries(dist, macosDir, app);
 		copyFileSync(join(dist, "preload-full.js"), join(resourcesDir, "preload-full.js"));
 		copyFileSync(
 			join(dist, "preload-sandboxed.js"),
@@ -310,7 +289,7 @@ function stageLocalBundle(logPrefix, templateRoot, app) {
 	mkdirSync(exeDir, { recursive: true });
 	mkdirSync(viewsDir, { recursive: true });
 
-	copyRuntimeLibraries(dist, exeDir);
+	copyRuntimeLibraries(dist, exeDir, app);
 	copyFileSync(join(dist, "preload-full.js"), join(resourcesDir, "preload-full.js"));
 	copyFileSync(
 		join(dist, "preload-sandboxed.js"),
@@ -350,7 +329,7 @@ function compileNimMain(logPrefix, templateRoot, executable, nimEntry) {
 }
 
 function runLocal(logPrefix, templateRoot, app, options) {
-	ensureDevkit(logPrefix, options.devkitBuild);
+	ensureDevkit(logPrefix, options.devkitBuild, app);
 	const { executable, nimEntry } = stageLocalBundle(logPrefix, templateRoot, app);
 	compileNimMain(logPrefix, templateRoot, executable, nimEntry);
 	if (options.buildOnly) {
