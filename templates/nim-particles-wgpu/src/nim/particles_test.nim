@@ -1,7 +1,20 @@
-import std/[math, unittest]
+import std/[math, typedthreads, unittest]
 import particles
 
+proc renderWorker() {.thread.} =
+  let buffers = newParticleBuffers()
+  let params = defaultSimParams()
+  simUpdate(buffers.sim, params, 1.0 / 60.0, 1.0)
+  let count = packInstances(buffers.sim, buffers.instances, 1.0)
+  doAssert count > 0
+  doAssert count == buffers.sim.alive
+
 suite "particle simulation":
+  test "render buffers fit on a default worker thread":
+    var worker: Thread[void]
+    createThread(worker, renderWorker)
+    joinThread(worker)
+
   test "reset clears live set":
     var sim: Sim
     sim.alive = 42

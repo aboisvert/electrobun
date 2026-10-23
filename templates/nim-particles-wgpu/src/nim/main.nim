@@ -598,9 +598,7 @@ proc gpuRenderLoopImpl() =
   if not apiOk:
     return
 
-  var sim: Sim
-  simReset(sim)
-  var instanceData: array[MaxParticles * FloatsPerInstance, float32]
+  let buffers = newParticleBuffers()
 
   var activeViewId: uint32
   var ctx: WgpuContext
@@ -631,7 +629,7 @@ proc gpuRenderLoopImpl() =
       continue
 
     if resetRequested:
-      simReset(sim)
+      simReset(buffers.sim)
 
     if not hasContext or activeViewId != viewId:
       var ctxErr: EbError
@@ -676,10 +674,10 @@ proc gpuRenderLoopImpl() =
     let aspect = float32(width) / max(float32(height), 1.0)
     var paramsLocal = params
     if not paramsLocal.paused:
-      simUpdate(sim, paramsLocal, dt, aspect)
-    let instanceCount = packInstances(sim, instanceData, aspect)
+      simUpdate(buffers.sim, paramsLocal, dt, aspect)
+    let instanceCount = packInstances(buffers.sim, buffers.instances, aspect)
 
-    if not renderFrame(state.core, api, ctx, pipeline, queue, instanceData, instanceCount):
+    if not renderFrame(state.core, api, ctx, pipeline, queue, buffers.instances, instanceCount):
       sleep(100)
       continue
     if not loggedFirstFrame:
@@ -687,7 +685,7 @@ proc gpuRenderLoopImpl() =
       echo "[nim-particles] first frame submitted (", instanceCount, " instances)"
 
     if frame mod 30 == 0 and hostWebviewId != 0:
-      sendGpuFrame(hostWebviewId, viewId, frame, width, height, sim.alive)
+      sendGpuFrame(hostWebviewId, viewId, frame, width, height, buffers.sim.alive)
 
     inc frame
     sleep(16)

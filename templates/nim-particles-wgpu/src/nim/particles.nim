@@ -35,6 +35,11 @@ type
     burstTimer*: float32
     clock*: float32
 
+  ParticleBuffers* = ref object
+    ## Allocate once on the heap: together these exceed a default worker stack.
+    sim*: Sim
+    instances*: array[MaxParticles * FloatsPerInstance, float32]
+
 proc defaultSimParams*(): SimParams =
   SimParams(
     mode: Fountain,
@@ -50,6 +55,10 @@ proc simReset*(sim: var Sim) =
   sim.emitCarry = 0
   sim.burstTimer = 0
   sim.clock = 0
+
+proc newParticleBuffers*(): ParticleBuffers =
+  new(result)
+  simReset(result.sim)
 
 proc randU32(state: var uint32): uint32 =
   var x = state
