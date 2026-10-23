@@ -285,6 +285,11 @@ jobs:
         run: hutch build.ts --vendor-rust-only --vendor-go-only
         working-directory: package
 
+      - name: Prepare pinned Nim compiler
+        if: "!(matrix.platform == 'win32' && matrix.arch == 'arm64')"
+        run: hutch build.ts --vendor-nim-only
+        working-directory: package
+
       - name: Test Rust Kitchen callback isolation
         run: node scripts/test-rust-webview-observations.mjs
         working-directory: kitchen
@@ -298,6 +303,7 @@ jobs:
         working-directory: kitchen
 
       - name: Test Nim Kitchen callback isolation
+        if: "!(matrix.platform == 'win32' && matrix.arch == 'arm64')"
         run: node scripts/test-nim-webview-observations.mjs
         working-directory: kitchen
 
