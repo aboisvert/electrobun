@@ -22,7 +22,6 @@ if (!versionLine) throw new Error("Nim compiler did not report its version");
 
 const temporaryRoot = realpathSync(tmpdir());
 const scratch = mkdtempSync(join(temporaryRoot, "electrobun-nim-observations-"));
-const executable = join(scratch, process.platform === "win32" ? "observations.exe" : "observations");
 const sdkPath = join(kitchen, "..", "package", "src", "sdks", "nim");
 
 function run(command, args) {
@@ -39,14 +38,19 @@ function run(command, args) {
 
 try {
 	console.log(`[nim-observations] ${versionLine.trim()}`);
-	console.log(`[nim-observations] Test executable: ${executable}`);
-	run(nim, [
-		"c",
-		"-o:" + executable,
-		`--path:${sdkPath}`,
-		join(kitchen, "src", "nim", "webview_observations.nim"),
-	]);
-	run(executable, []);
+	for (const suite of ["webview_observations", "worker_threads_test"]) {
+		const executable = join(scratch, suite + (process.platform === "win32" ? ".exe" : ""));
+		console.log(`[nim-observations] Test executable: ${executable}`);
+		run(nim, [
+			"c",
+			"--threads:on",
+			"--mm:orc",
+			"-o:" + executable,
+			`--path:${sdkPath}`,
+			join(kitchen, "src", "nim", `${suite}.nim`),
+		]);
+		run(executable, []);
+	}
 } catch (error) {
 	console.error(`[nim-observations] Retained failed test files: ${scratch}`);
 	throw error;

@@ -1,6 +1,7 @@
 ## Electrobun Kitchen Sink - Nim main process.
 import std/[json, os, strutils, strformat, times, monotimes, locks, atomics, parseutils, math, tables, syncio, options, typedthreads]
 import electrobun
+import ./worker_threads
 
 const appVersion = "1.18.1"
 const defaultSecretKey = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32"
@@ -846,6 +847,9 @@ type
     requestId*: Option[uint64]
     interactiveOnly*: bool
 
+var singleTestWorkers: WorkerThreads[ptr SingleTestJob]
+var allTestsWorkers: WorkerThreads[ptr AllTestsJob]
+
 proc appState(): ptr AppState =
   if gState == nil:
     raiseAssert("electrobun kitchen nim state not initialized")
@@ -882,6 +886,8 @@ template cHandler*(T: typedesc; fn: untyped): T =
 
 proc drainHostMessageQueue() =
   while hostQueueRunning.load(moAcquire):
+    discard singleTestWorkers.reapFinishedWorkers()
+    discard allTestsWorkers.reapFinishedWorkers()
     let state = gState
     if state.isNil:
       sleep(10)
@@ -4140,8 +4146,7 @@ proc startSingleTest(webviewId: uint32; requestId: Option[uint64]; nimTest: NimT
   job.webviewId = webviewId
   job.requestId = requestId
   job.nimTest = nimTest
-  var testThread: Thread[ptr SingleTestJob]
-  createThread(testThread, runSingleTestJob, job)
+  singleTestWorkers.startWorker(runSingleTestJob, job)
   true
 
 proc startAllTests(webviewId: uint32; requestId: Option[uint64]; interactiveOnly: bool): bool =
@@ -4154,8 +4159,7 @@ proc startAllTests(webviewId: uint32; requestId: Option[uint64]; interactiveOnly
   job.webviewId = webviewId
   job.requestId = requestId
   job.interactiveOnly = interactiveOnly
-  var allTestsThread: Thread[ptr AllTestsJob]
-  createThread(allTestsThread, runAllTestsJob, job)
+  allTestsWorkers.startWorker(runAllTestsJob, job)
   true
 
 proc maybeAutoRunAfterHandshake(webviewId: uint32) =
@@ -4557,6 +4561,11 @@ proc main() =
   gState = addr state
   defer:
     gState = nil
+  initWorkerThreads(singleTestWorkers)
+  initWorkerThreads(allTestsWorkers)
+  defer:
+    deinitWorkerThreads(singleTestWorkers)
+    deinitWorkerThreads(allTestsWorkers)
   block setHandlers:
     let err = core.setGlobalShortcutCallback(cast[GlobalShortcutHandler](shortcutTriggeredHandler))
     if err != ebNone:
