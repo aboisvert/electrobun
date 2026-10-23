@@ -149,6 +149,17 @@ function collectSdkPaths(sdks) {
 	paths.push(relativePath(odin.collection, "layout.sdks.odin.collection"));
 	string(odin.collectionName, "layout.sdks.odin.collectionName");
 
+	const nim = object(sdks.nim, "layout.sdks.nim");
+	const nimRoot = relativePath(nim.root, "layout.sdks.nim.root");
+	const nimEntrypoint = relativePath(nim.entrypoint, "layout.sdks.nim.entrypoint");
+	if (nimEntrypoint !== `${nimRoot}/electrobun.nim`) {
+		fail("layout.sdks.nim.entrypoint must be electrobun.nim at layout.sdks.nim.root");
+	}
+	if (nim.supported !== undefined && typeof nim.supported !== "boolean") {
+		fail("layout.sdks.nim.supported must be a boolean");
+	}
+	paths.push(nimRoot, nimEntrypoint);
+
 	return paths;
 }
 
@@ -203,7 +214,7 @@ export function validateNativeDevkitManifest(options) {
 	const toolchains = object(manifest.toolchains, "toolchains");
 	// cottontail pins the app runtime bundled by mainProcess: "cottontail",
 	// like bun pins the bundled Bun; the build-time Cottontail is Hutch's.
-	for (const language of ["zig", "rust", "go", "bun", "cottontail"]) {
+	for (const language of ["zig", "rust", "go", "nim", "bun", "cottontail"]) {
 		const toolchain = object(toolchains[language], `toolchains.${language}`);
 		exactVersion(
 			toolchain.defaultVersion,

@@ -95,6 +95,8 @@ function manifestPaths(manifest: NativeDevkitManifest): string[] {
 		sdk.odin.root,
 		sdk.odin.entrypoint,
 		sdk.odin.collection,
+		sdk.nim.root,
+		sdk.nim.entrypoint,
 	];
 }
 

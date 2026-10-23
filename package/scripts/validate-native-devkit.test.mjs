@@ -47,6 +47,8 @@ function declaredPaths(manifest) {
 		sdks.odin.root,
 		sdks.odin.entrypoint,
 		sdks.odin.collection,
+		sdks.nim.root,
+		sdks.nim.entrypoint,
 	]);
 }
 
@@ -103,6 +105,29 @@ test("validates an exact devkit contract and every declared path", () => {
 	} finally {
 		rmSync(coreRoot, { recursive: true, force: true });
 	}
+});
+
+test("validates Nim compiler metadata and SDK layout", (t) => {
+	const coreRoot = makeCore();
+	t.after(() => rmSync(coreRoot, { recursive: true, force: true }));
+	const validate = (mutate) => {
+		const manifest = fixture();
+		mutate(manifest);
+		writeFileSync(join(coreRoot, NATIVE_DEVKIT_MANIFEST_FILENAME), JSON.stringify(manifest));
+		return () => validateNativeDevkitManifest({ coreRoot, ...expected });
+	};
+	assert.throws(validate((m) => delete m.toolchains.nim), /toolchains\.nim/);
+	for (const version of ["latest", "^2.2.12", "2.2", ""]) {
+		assert.throws(validate((m) => m.toolchains.nim.defaultVersion = version), /toolchains\.nim/);
+	}
+	assert.throws(validate((m) => delete m.layout.sdks.nim), /layout\.sdks\.nim/);
+	assert.throws(validate((m) => m.layout.sdks.nim.root = "../outside"), /layout\.sdks\.nim\.root/);
+	assert.throws(validate((m) => m.layout.sdks.nim.entrypoint = "nim-sdk/other.nim"), /electrobun\.nim/);
+	assert.throws(validate((m) => m.layout.sdks.nim.supported = "false"), /supported must be a boolean/);
+	validate((m) => m.layout.sdks.nim.supported = false)();
+	const valid = validate(() => {});
+	rmSync(join(coreRoot, "nim-sdk", "electrobun.nim"));
+	assert.throws(valid, /declared path does not exist: "nim-sdk\/electrobun.nim"/);
 });
 
 test("rejects a stale emitted app runtime before packaging", (t) => {

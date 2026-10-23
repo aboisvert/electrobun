@@ -48,6 +48,7 @@ type DevkitFixture = {
 			rust: Record<string, string>;
 			go: Record<string, string>;
 			odin: Record<string, string>;
+			nim: Record<string, string>;
 		};
 	};
 	[key: string]: unknown;
@@ -78,6 +79,8 @@ function declaredDevkitPaths(manifest: DevkitFixture): Set<string> {
 		...Object.values(sdks.rust),
 		...Object.values(sdks.go).filter((value) => value.includes("/")),
 		...Object.values(sdks.odin).filter((value) => value.includes("/")),
+		sdks.nim.root,
+		sdks.nim.entrypoint,
 	]);
 }
 
@@ -87,6 +90,7 @@ function writeDevkit(packageDir: string): DevkitFixture {
 	const directories = new Set([
 		manifest.layout.sdks.javascript.root as string,
 		manifest.layout.sdks.zig.root,
+		manifest.layout.sdks.nim.root,
 		manifest.layout.sdks.rust.root,
 		manifest.layout.sdks.go.root,
 		manifest.layout.sdks.odin.root,
