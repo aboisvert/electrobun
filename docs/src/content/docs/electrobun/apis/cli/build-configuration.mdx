@@ -167,7 +167,7 @@ Windows and Linux URL schemes and file associations are not yet implemented.
 | `rust` | `build.rust` | `Cargo.toml`, binary target `main` |
 | `go` | `build.go` | `go.mod`, package `./src/go` |
 | `odin` | `build.odin` | package containing `src/odin/main.odin` |
-| `nim` | `build.nim` | `src/nim/main.nim` (default entrypoint; declared but not yet wired) |
+| `nim` | `build.nim` | `src/nim/main.nim` (default entrypoint) |
 
 ```typescript
 import type { ElectrobunConfig } from "electrobun";
@@ -204,10 +204,14 @@ Native build descriptions remain project-owned:
 - Odin: normal source package; `entrypoint` defaults to
   `src/odin/main.odin`, and Hutch passes the projected `electrobun_sdk`
   collection. No `build.odin` is generated or required.
-- Nim: `entrypoint` defaults to `src/nim/main.nim`. The devkit declares the
-  Nim default version and SDK path, but Hutch does not yet accept
-  `mainProcess: "nim"` — repository scripts compile with the vendored pinned
-  toolchain in the meantime.
+- Nim: `entrypoint` defaults to `src/nim/main.nim`. Hutch compiles it with
+  `nim c --threads:on --mm:orc` and the SDK on
+  `--path:<project>/.hutch/devkit/nim-sdk`, using the devkit's pinned Nim
+  version — an exact match from `PATH`, otherwise acquired into
+  `~/.hutch/toolchains/<language>/<version>/<platform>`. This needs Hutch
+  0.28.2 or later and a devkit release that declares the Nim toolchain and SDK
+  entries; devkit releases published through 2.0.5-beta.4 lack them, so build
+  the package devkit from the repository in the meantime.
 
 Hutch invokes the normal project build tool. It does not generate `build.zig`,
 Cargo manifests, Go modules, or a temporary GOPATH.

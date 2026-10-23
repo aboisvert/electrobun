@@ -7,6 +7,7 @@ import {
 	cpSync,
 	existsSync,
 	mkdirSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -25,7 +26,9 @@ function usage() {
 Build and run a Nim Electrobun template against the local package devkit.
 
 Options:
-  --hutch         Use Hutch (electrobun sync/build/run) instead of a repo-local bundle
+  --hutch         Use Hutch (electrobun sync/build/run) instead of a repo-local
+                  bundle. Requires Hutch >= 0.28.2 and a devkit with Nim
+                  entries; set HUTCH_BINARY to override the resolved hutch.
   --build-only    Stage and compile without launching the app
   --no-devkit-build
                   Do not run package build.ts when dist/ is incomplete
@@ -357,10 +360,59 @@ function runLocal(logPrefix, templateRoot, app, options) {
 	run(logPrefix, "Running app", executable, [], dirname(executable));
 }
 
-function runWithHutch(logPrefix, templateRoot, options) {
-	throw new Error(
-		`${logPrefix}: Hutch electrobun dev does not support mainProcess "nim" yet. Rerun without --hutch (local dev bundle).`,
+// Hutch compiles Nim mains only when the resolved devkit release carries the
+// toolchain and SDK layout entries; older releases fail with
+// `NimNotSupportedByElectrobunRelease`. Prefer the repo-local dist (which the
+// local-bundle route already depends on) so `--hutch` and local runs agree.
+// The override also pins the Electrobun version the project must resolve to:
+// floating templates target the stable channel (2.0.4), which mismatches this
+// devkit, so route hutch through the npm-default selector the shim uses.
+function distShipsNimDevkit() {
+	let manifest = null;
+	try {
+		manifest = JSON.parse(
+			readFileSync(join(packageRoot, "dist", "native-devkit.json"), "utf8"),
+		);
+	} catch {
+		return null;
+	}
+	const shipping = Boolean(
+		manifest?.toolchains?.nim?.defaultVersion &&
+			manifest?.layout?.sdks?.nim &&
+			typeof manifest?.product?.version === "string",
 	);
+	return shipping ? manifest.product.version : null;
+}
+
+function resolveHutchForTemplates() {
+	const hutch = selectHutchBinary();
+	if (hutch !== "hutch" && !existsSync(hutch)) {
+		throw new Error(
+			`Hutch binary not found: ${hutch}. Install Hutch or set HUTCH_BINARY to its path.`,
+		);
+	}
+	return hutch;
+}
+
+function runWithHutch(logPrefix, templateRoot, options) {
+	const hutch = resolveHutchForTemplates();
+	const env = { ...process.env };
+	if (!env.HUTCH_ELECTROBUN_DEVKIT_ROOT) {
+		const devkitVersion = distShipsNimDevkit();
+		if (devkitVersion) {
+			env.HUTCH_ELECTROBUN_DEVKIT_ROOT = join(packageRoot, "dist");
+			if (!env.HUTCH_DEFAULT_ELECTROBUN) {
+				env.HUTCH_DEFAULT_ELECTROBUN = devkitVersion;
+			}
+		}
+	}
+	run(logPrefix, "Syncing Hutch project files", hutch, ["electrobun", "sync", "--env=dev"], templateRoot, env);
+	run(logPrefix, "Building with Hutch", hutch, ["electrobun", "build", "--env=dev"], templateRoot, env);
+	if (options.buildOnly) {
+		console.log(`[${logPrefix}] Built with Hutch (--build-only); not launching.`);
+		return;
+	}
+	run(logPrefix, "Running with Hutch", hutch, ["electrobun", "dev", "--env=dev"], templateRoot, env);
 }
 
 async function main() {

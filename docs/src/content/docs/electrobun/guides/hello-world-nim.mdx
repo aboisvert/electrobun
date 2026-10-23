@@ -172,10 +172,19 @@ with `nim c` and the Nim SDK on `--path`; it does not generate a nimble file.
 
 ## 5. Run the app
 
-Hutch does not yet accept `mainProcess: "nim"` in `hutch electrobun
-build`/`run`/`dev`. For now, run Nim apps with the repository scripts, which
-compile with the vendored pinned toolchain. Inside the Electrobun repository,
-you can run the checked-in sample without creating a project first:
+Run it with Hutch from the project directory:
+
+```bash
+hutch electrobun sync --env=dev
+hutch electrobun build --env=dev
+```
+
+`hutch electrobun dev` does the same and rebuilds on source changes. This
+needs Hutch 0.28.2 or later and a devkit release that carries the Nim
+toolchain and SDK entries. With older devkits, run Nim apps with the
+repository scripts, which compile with the vendored pinned toolchain. Inside
+the Electrobun repository, you can run the checked-in sample without
+creating a project first:
 
 ```bash
 cd package
@@ -184,9 +193,8 @@ hutch run:nim-hello-world
 
 That script builds the local devkit when needed, compiles
 `templates/nim-hello-world`, stages a dev bundle, and launches the window.
-Use `--build-only` to compile without opening the app. The project above
-mirrors `templates/nim-hello-world`, so once Hutch accepts Nim,
-`hutch electrobun sync` followed by `hutch run dev` becomes the normal flow.
+Use `--build-only` to compile without opening the app, or `--hutch` to route
+the run through `hutch electrobun sync` and `build`/`dev`.
 
 <Aside type="note">
 The app only works from a hutch-built bundle layout — the SDK loads
@@ -239,10 +247,11 @@ hutch electrobun init nim-app --template=nim-particles-wgpu
 ## Toolchain
 
 Electrobun 2 pins **Nim 2.2.12** and guarantees the SDK against that release.
-Override it exactly with `build.nim.version`. The SDK requires the vendored
-toolchain from the repository build (`package/vendors/nim`); a system `nim` is
-used only when it reports the exact pinned version (never an arbitrary one).
-The compiler is not bundled into the finished app.
+Override it exactly with `build.nim.version`. Hutch reuses a system `nim` only
+when it reports the exact pinned version (never an arbitrary one), otherwise
+it acquires the pinned release into `~/.hutch/toolchains`; the repository
+scripts use the vendored pinned toolchain from the repository build
+(`package/vendors/nim`). The compiler is not bundled into the finished app.
 
 Platform requirements: macOS needs the Xcode Command Line Tools, Linux needs
 `clang`, and Windows needs Visual Studio Build Tools (MSVC `link.exe`) plus

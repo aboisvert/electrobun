@@ -76,10 +76,14 @@ figures are extracted executable sizes, not compressed archive sizes.
 
 ## Native main processes
 
-Applications can use Zig, Rust, Go, or Odin without shipping a JavaScript
+Applications can use Zig, Rust, Go, Odin, or Nim without shipping a JavaScript
 runtime. Hutch uses a compatible system compiler when available and otherwise
 acquires Electrobun's pinned toolchain. The SDKs share the same core window,
 view, RPC, lifecycle, and WGPU contracts.
+
+Nim joins with the hello world, notes, and WGPU particles templates. Nim
+builds need Hutch 0.28.2 or later and a devkit release that carries the Nim
+toolchain and SDK entries; like Odin, Windows Nim builds are x64-only.
 
 Odin is new in 2.0 and includes native WGPU templates for data-oriented
 particles, fluid simulation, soft-body bunny physics, a cellular alchemy
