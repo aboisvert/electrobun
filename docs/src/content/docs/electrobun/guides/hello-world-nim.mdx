@@ -22,7 +22,7 @@ project does not need a `package.json`:
 
 ```ts docs=syntax
 export default {
-  electrobun: { version: "2.0.4" },
+  electrobun: { version: "2.0.5-beta.4" },
   scripts: {
     dev: ["hutch", "electrobun", "dev", "--watch"],
     build: ["hutch", "electrobun", "build", "--env=stable"],
@@ -180,8 +180,13 @@ hutch electrobun build --env=dev
 ```
 
 `hutch electrobun dev` does the same and rebuilds on source changes. This
-needs Hutch 0.28.2 or later and a devkit release that carries the Nim
-toolchain and SDK entries. With older devkits, run Nim apps with the
+needs a Hutch build containing the Nim integration and a devkit release that
+carries the Nim toolchain and SDK entries. The published Hutch
+`0.28.2-canary.3` does not contain that integration; a version number alone is
+not sufficient. The example pin above must resolve to a Nim-enabled devkit;
+for an unpublished repository build, set `HUTCH_ELECTROBUN_DEVKIT_ROOT` to
+`package/dist` and use a locally rebuilt Hutch via `HUTCH_BINARY`. Until a
+compatible release is published, run Nim apps with the
 repository scripts, which compile with the vendored pinned toolchain. Inside
 the Electrobun repository, you can run the checked-in sample without
 creating a project first:

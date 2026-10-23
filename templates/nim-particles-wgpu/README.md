@@ -9,7 +9,7 @@ a devkit release that ships the Nim toolchain and SDK entries):
 hutch run dev
 ```
 
-`hutch run dev` builds the app, launches it, and rebuilds when source files change. This native template has no npm dependencies.
+`hutch run dev` builds the app, launches it, and rebuilds when source files change. This requires an unreleased Hutch build containing the Nim integration (not published `0.28.2-canary.3`) and a Nim-enabled devkit. Until compatible releases are published, use the repository runner. This native template has no npm dependencies.
 
 The main process lives in `src/nim/main.nim` (simulation in `src/nim/particles.nim`); the webview lives in `src/mainview`.
 

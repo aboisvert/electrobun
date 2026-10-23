@@ -4,7 +4,8 @@ Minimal Electrobun app with a Nim main process. See the
 [hello world guide](https://electrobun.dev/electrobun/guides/hello-world-nim/).
 
 With Hutch directly (after `hutch electrobun sync` in this directory; requires
-Hutch ≥ 0.28.2 and a devkit release that ships the Nim toolchain and SDK
+an unreleased Hutch build containing the Nim integration, not published
+`0.28.2-canary.3`, and a devkit release that ships the Nim toolchain and SDK
 entries):
 
 ```bash

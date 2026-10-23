@@ -27,7 +27,8 @@ Build and run a Nim Electrobun template against the local package devkit.
 
 Options:
   --hutch         Use Hutch (electrobun sync/build/run) instead of a repo-local
-                  bundle. Requires Hutch >= 0.28.2 and a devkit with Nim
+                  bundle. Requires a Hutch build with the unreleased Nim
+                  integration (not published 0.28.2-canary.3) and a devkit with Nim
                   entries; set HUTCH_BINARY to override the resolved hutch.
   --build-only    Stage and compile without launching the app
   --no-devkit-build

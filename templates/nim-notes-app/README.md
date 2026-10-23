@@ -2,7 +2,8 @@
 
 Same notes UI as the Bun [`notes-app`](../notes-app/) template, with a Nim main process.
 
-With Hutch directly (after `hutch electrobun sync`; requires Hutch ≥ 0.28.2
+With Hutch directly (after `hutch electrobun sync`; requires an unreleased
+Hutch build containing the Nim integration, not published `0.28.2-canary.3`,
 and a devkit release that ships the Nim toolchain and SDK entries):
 
 ```bash

@@ -123,8 +123,10 @@ to `.hutch/devkit/go-sdk`. Odin compiles the configured source package with the
 projected `electrobun_sdk` collection. Nim compiles the configured entrypoint
 with `nim c --path:<project>/.hutch/devkit/nim-sdk`, resolving the devkit's
 pinned Nim version by exact `PATH` match or from `~/.hutch/toolchains`. This
-needs Hutch 0.28.2 or later plus a devkit release that declares the Nim
-entries; the script fallback below covers older devkits. Hutch does not
+needs a Hutch build containing the Nim integration (not the published
+`0.28.2-canary.3`) plus a devkit release that declares the Nim entries.
+Until compatible releases are published, use the repository script fallback.
+Hutch does not
 generate any of those build descriptions or synthesize a GOPATH.
 
 The fastest way to see real native SDK code is to generate a template — each
